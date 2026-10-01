@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:chat": "node --test tests/chat-response.test.mjs",
+    "test:chat": "node --test tests/*.test.mjs",
     "check:chat": "npm run lint && npm run test:chat && npm run build"
   },
   "dependencies": {
