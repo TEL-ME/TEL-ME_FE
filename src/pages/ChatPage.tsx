@@ -157,7 +157,13 @@ export default function ChatPage() {
     invalidRoute || (messagesQuery.error instanceof ApiError && [400, 403, 404].includes(messagesQuery.error.status))
   const showThread = activeId != null && !notFound
   const lastAssistant = messages.filter((m) => m.role === 'ASSISTANT').at(-1)
-  const placeholder = lastAssistant?.messageType === 'CLARIFICATION' ? '예: 강남역 근처, 마포구' : undefined
+  // 되묻기 답변일 때 입력창 안내. 되묻는 내용 종류를 서버가 따로 주지 않아 질문 문장으로 고른다
+  const placeholder =
+    lastAssistant?.messageType !== 'CLARIFICATION'
+      ? undefined
+      : /매장|지역|위치|근처|동네|어디/.test(lastAssistant.content ?? '')
+        ? '예: 강남역 근처, 마포구'
+        : '무러바라가 물어본 내용을 알려 주세요'
 
   // 상담 종료: 가장 최근 답변 아래 버튼 → 확인 → 종료 (기록은 남고 더 질문할 수 없다)
   const queryClient = useQueryClient()

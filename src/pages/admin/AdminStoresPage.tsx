@@ -1,8 +1,9 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Search, X } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { adminStoreApi, type StoreStatusFilter } from '../../api/admin'
-import { Badge, Card, Empty, FilterSelect, PageHeader, Pager, TableHead } from '../../features/admin/components/AdminUi'
+import { Badge, Card, Empty, FilterSelect, PageHeader, Pager, primaryBtn, secondaryBtn, TableHead } from '../../features/admin/components/AdminUi'
 
 const STATUSES = [
   ['OPEN', '영업'],
@@ -15,7 +16,7 @@ const DAY: Record<string, string> = {
 const COLS = '64px minmax(0,0.9fr) minmax(0,1.3fr) 120px minmax(0,1fr) 64px'
 const hm = (t: string | null) => (t ? t.slice(0, 5) : '')
 
-/** 매장 관리 (시안 AdminStores). 백엔드에 수정·등록 API가 없어 조회만 한다 */
+/** 매장 관리 (시안 AdminStores). 목록에서 고르면 오른쪽에 정보, 등록·수정은 별도 화면 */
 export default function AdminStoresPage() {
   const [input, setInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -39,7 +40,12 @@ export default function AdminStoresPage() {
       <PageHeader
         title="매장 관리"
         desc="상담과 지도에 나오는 매장이에요. 폐점한 매장은 사용자 화면에서 빠져요."
-        actions={<span className="rounded-full border border-dashed border-line px-2.5 py-1 text-xs font-bold text-ink-muted">수정·등록은 준비 중</span>}
+        actions={
+          <Link to="/admin/stores/new" className={primaryBtn}>
+            <Plus size={18} aria-hidden />
+            매장 등록
+          </Link>
+        }
       />
       <div className="flex flex-wrap items-center gap-4">
         <label className="flex h-10 w-full max-w-[320px] min-w-[200px] flex-1 items-center gap-2 rounded-full border-[1.5px] border-line bg-surface px-3.5 text-ink-sub focus-within:border-brand">
@@ -139,6 +145,9 @@ function StoreDetail({ id, onClose }: { id: number; onClose: () => void }) {
               ))}
             </ul>
           </div>
+          <Link to={`/admin/stores/${data.storeId}`} className={secondaryBtn}>
+            {data.status === 'CLOSED_DOWN' ? '자세히 보기' : '수정하기'}
+          </Link>
         </div>
       )}
     </Card>

@@ -51,7 +51,7 @@ export default function MyPage() {
                   </strong>
                 </div>
                 <span className="text-xs text-ink-sub">
-                  {DUMMY_ACCOUNT.phone} · {DUMMY_ACCOUNT.plan} <Temp />
+                  {DUMMY_ACCOUNT.plan} <Temp />
                 </span>
                 <span className="mt-5 text-[13px] text-ink-sub">
                   이번 달 예상 요금 <Temp />

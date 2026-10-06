@@ -237,7 +237,7 @@ function FaqForm({ faq }: { faq: FaqDetail | null }) {
         title="영구 삭제할까요?"
         confirmLabel="영구 삭제"
         onCancel={() => setConfirm(null)}
-        onConfirm={() => faq && void run(() => adminFaqApi.purge(faq.faqId, faq.lockVersion), 'FAQ를 영구 삭제했어요', () => navigate('/admin/faqs'))}
+        onConfirm={() => faq && void run(() => adminFaqApi.purge(faq.faqId), 'FAQ를 영구 삭제했어요', () => navigate('/admin/faqs'))}
       >
         되돌릴 수 없어요. 이 FAQ가 데이터베이스에서 완전히 사라져요.
       </ConfirmDialog>

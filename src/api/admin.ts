@@ -79,9 +79,8 @@ export const adminFaqApi = {
   /** 상태를 DELETED로 (되돌릴 수 있음) */
   remove: (id: number, lockVersion?: number) =>
     api<null>(`/api/v1/admin/faqs/${id}`, { method: 'DELETE', query: { lockVersion } }),
-  /** 행을 실제로 지운다. DELETED이고 인용된 적 없는 FAQ만 */
-  purge: (id: number, lockVersion?: number) =>
-    api<null>(`/api/v1/admin/faqs/${id}/permanent`, { method: 'DELETE', query: { lockVersion } }),
+  /** 행을 실제로 지운다. 서버가 DELETED이고 인용 0회인 FAQ만 허용해서 lockVersion은 보내지 않는다 */
+  purge: (id: number) => api<null>(`/api/v1/admin/faqs/${id}/permanent`, { method: 'DELETE' }),
 }
 
 // ---- 답변 품질: 싫어요 피드백 ----
@@ -167,7 +166,7 @@ export const adminUnansweredApi = {
   get: (messageId: number) => api<UnansweredDetail>(`/api/v1/admin/unanswered/${messageId}`),
 }
 
-// ---- 매장 (조회만) ----
+// ---- 매장 ----
 export type StoreStatusFilter = 'OPEN' | 'CLOSED_DOWN' | 'ALL'
 
 export interface StoreService {
@@ -185,17 +184,51 @@ export interface AdminStoreListItem {
   updatedAt: string
 }
 
+export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
+
+export interface StoreHours {
+  dayOfWeek: DayOfWeek
+  /** "HH:mm" 또는 "HH:mm:ss". 휴무면 null */
+  openTime: string | null
+  closeTime: string | null
+  closed: boolean
+}
+
 export interface AdminStoreDetail extends Omit<AdminStoreListItem, 'services'> {
   regionCode: string | null
   latitude: number
   longitude: number
-  hours: { dayOfWeek: string; openTime: string | null; closeTime: string | null; closed: boolean }[]
+  hours: StoreHours[]
   services: StoreService[]
   createdAt: string
+  lockVersion: number
+}
+
+/** 등록·수정 요청 (상태는 받지 않는다. 폐점은 삭제 API로만) */
+export interface AdminStoreSave {
+  name: string
+  address: string
+  phone: string | null
+  /** 법정동코드 숫자 10자리 */
+  regionCode: string
+  latitude: number
+  longitude: number
+  /** 월~일 7일 모두 */
+  hours: StoreHours[]
+  /** 1개 이상 */
+  serviceCodes: string[]
+  /** 수정 때 필수 */
+  lockVersion?: number
 }
 
 export const adminStoreApi = {
   list: (q: { keyword?: string; status?: StoreStatusFilter; page?: number; size?: number }) =>
     api<{ stores: AdminStoreListItem[] } & Page>('/api/v1/admin/stores', { query: { ...q } }),
   get: (id: number) => api<AdminStoreDetail>(`/api/v1/admin/stores/${id}`),
+  serviceTypes: () => api<StoreService[]>('/api/v1/admin/stores/service-types'),
+  create: (body: AdminStoreSave) => api<AdminStoreDetail>('/api/v1/admin/stores', { method: 'POST', body }),
+  update: (id: number, body: AdminStoreSave) =>
+    api<AdminStoreDetail>(`/api/v1/admin/stores/${id}`, { method: 'PUT', body }),
+  /** 실제로 지우지 않고 폐점(CLOSED_DOWN)으로 바꾼다 */
+  remove: (id: number) => api<null>(`/api/v1/admin/stores/${id}`, { method: 'DELETE' }),
 }

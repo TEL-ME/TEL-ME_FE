@@ -3,7 +3,6 @@
  * 화면에는 모두 "(임시)"를 붙인다. API가 생기면 이 파일을 지우고 실제 값으로 바꾼다.
  */
 export const DUMMY_ACCOUNT = {
-  phone: '010-****-1234',
   plan: '5G 요금제',
   monthlyFee: 68_000,
   feeDiff: -3_200, // 지난달 대비
