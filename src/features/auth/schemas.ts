@@ -28,3 +28,9 @@ export const signupSchema = z
   .refine((v) => v.password === v.passwordConfirm, { path: ['passwordConfirm'], message: '비밀번호가 서로 달라요' })
   .refine((v) => v.agreeTerms && v.agreePrivacy, { path: ['agreeTerms'], message: '필수 약관에 동의해 주세요' })
 export type SignupForm = z.infer<typeof signupSchema>
+
+/** 이메일 로그인 추가 (카카오 회원) */
+export const addEmailLoginSchema = z
+  .object({ email, password, passwordConfirm: z.string() })
+  .refine((v) => v.password === v.passwordConfirm, { path: ['passwordConfirm'], message: '비밀번호가 서로 달라요' })
+export type AddEmailLoginForm = z.infer<typeof addEmailLoginSchema>

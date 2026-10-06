@@ -1,12 +1,14 @@
-import { ChevronRight, Link2 } from 'lucide-react'
+import { ChevronRight, Link2, Mail } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import avatarImg from '../assets/mudo/mudo-avatar.png'
+import { startKakaoLink } from '../features/auth/accountLink'
 import { openLoginSheet } from '../features/auth/loginSheetStore'
 import { logout, useMe } from '../features/auth/useAuth'
 import { useThemeStore, type ThemeSetting } from '../stores/themeStore'
 import { showToast } from '../stores/toastStore'
+import type { LoginMethod, Me } from '../api/types'
 
 const APP_VERSION = '1.0.0'
 
@@ -53,7 +55,7 @@ export default function SettingsPage() {
                 {isUser ? (me.name ? `${me.name} 님` : (me.email ?? '카카오 계정')) : '게스트로 이용 중'}
               </strong>
               <span className="text-xs leading-4 text-ink-sub">
-                {isUser ? (me.name && me.email ? me.email : '로그인 중') : '로그인하면 상담 기록이 내 계정에 저장돼요'}
+                {isUser ? accountSub(me) : '로그인하면 상담 기록이 내 계정에 저장돼요'}
               </span>
             </span>
           </div>
@@ -65,6 +67,29 @@ export default function SettingsPage() {
             >
               <Link2 size={18} strokeWidth={2} aria-hidden />
               <span className="flex-1">간편 로그인 연결</span>
+              <ChevronRight size={18} strokeWidth={2} aria-hidden className="text-ink-muted" />
+            </button>
+          )}
+          {/* 로그인 수단 추가: 없는 쪽만 보인다 */}
+          {isUser && !me.loginMethods.includes('KAKAO') && (
+            <button
+              type="button"
+              onClick={startKakaoLink}
+              className="flex min-h-[56px] w-full items-center gap-3 px-1 text-left text-[15px] font-bold text-brand-strong"
+            >
+              <Link2 size={18} strokeWidth={2} aria-hidden />
+              <span className="flex-1">카카오 연결하기</span>
+              <ChevronRight size={18} strokeWidth={2} aria-hidden className="text-ink-muted" />
+            </button>
+          )}
+          {isUser && !me.loginMethods.includes('EMAIL') && (
+            <button
+              type="button"
+              onClick={() => navigate('/settings/email-login')}
+              className="flex min-h-[56px] w-full items-center gap-3 px-1 text-left text-[15px] font-bold text-brand-strong"
+            >
+              <Mail size={18} strokeWidth={2} aria-hidden />
+              <span className="flex-1">이메일 로그인 추가</span>
               <ChevronRight size={18} strokeWidth={2} aria-hidden className="text-ink-muted" />
             </button>
           )}
@@ -136,4 +161,12 @@ export default function SettingsPage() {
       </ConfirmDialog>
     </main>
   )
+}
+
+const METHOD_LABEL: Record<LoginMethod, string> = { EMAIL: '이메일', KAKAO: '카카오' }
+
+/** 계정 줄 아래 글: 이메일(이름이 위에 있을 때) · 로그인 수단 */
+function accountSub(me: Me) {
+  const methods = me.loginMethods.length ? `${me.loginMethods.map((m) => METHOD_LABEL[m]).join('·')} 로그인` : null
+  return [me.name ? me.email : null, methods].filter(Boolean).join(' · ') || '로그인 중'
 }
