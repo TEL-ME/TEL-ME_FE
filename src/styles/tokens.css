@@ -1,0 +1,67 @@
+/*
+ * TEL-ME 색 토큰 — 디자인 캔버스 "다크 모드 · 색 토큰" 보드와 같은 값
+ * 라이트 = 회색 시안, 다크 = 다크 시안. 글자 대비는 모두 4.5:1 이상.
+ */
+:root {
+  --backdrop: #e7e2e5; /* 넓은 화면에서 앱 바깥 배경 */
+  --bg: #f4f1f3;
+  --surface: #ffffff;
+  --surface-2: #f4f1f3;
+  --line: #dcd5da;
+  --field-disabled: #e4dee2; /* 잠긴 입력창 (답변 준비 중) — 바탕(#f4f1f3)과 확실히 구분되게 */
+  --text: #2b262d;
+  --text-sub: #6b696e;
+  --text-muted: #77727a;
+  --brand: #c34074; /* 채움(보내기 버튼, 내 말풍선). 위 글자는 흰색 */
+  --brand-text: #c34074; /* 글자·아이콘 */
+  --brand-strong: #a8335f;
+  --brand-soft: #fbe9f1;
+  --inverse: #2b262d; /* 주 버튼 바탕 */
+  --on-inverse: #ffffff;
+  --danger: #b4233c;
+  --success: #1c6e59;
+  --notice-bg: #f4eefa; /* 근거 없음·범위 밖 답변 말풍선 */
+  --notice-text: #6a4f8f;
+  --admin-hero: linear-gradient(140deg, #fbeef4, #f2eef8); /* 관리자 로그인 왼쪽 */
+  --chip-plan-bg: #e3f4ef;
+  --chip-plan: #1c6e59;
+  --chip-store-bg: #fdeee4;
+  --chip-store: #a54b17;
+  --chip-usim-bg: #f1e9fb;
+  --chip-usim: #6b3aad;
+  --chip-roam-bg: #e6effa;
+  --chip-roam: #2a5f9e;
+  color-scheme: light;
+}
+
+:root.dark {
+  --backdrop: #3b3840;
+  --bg: #17141a;
+  --surface: #241f27;
+  --surface-2: #302a34;
+  --line: #3a333f;
+  --field-disabled: #2e2933;
+  --text: #f3eef2;
+  --text-sub: #b9b0b8;
+  --text-muted: #9d949e;
+  --brand: #c34074;
+  --brand-text: #ef7fae;
+  --brand-strong: #f6a6c7;
+  --brand-soft: #46243a;
+  --inverse: #f3eef2;
+  --on-inverse: #17141a;
+  --danger: #ff8f9f;
+  --success: #86dcbf;
+  --notice-bg: #2b2338;
+  --notice-text: #c9aaf3;
+  --admin-hero: linear-gradient(140deg, #2a2129, #241f2e);
+  --chip-plan-bg: #183a30;
+  --chip-plan: #86dcbf;
+  --chip-store-bg: #42281b;
+  --chip-store: #f5ad80;
+  --chip-usim-bg: #33264c;
+  --chip-usim: #c9aaf3;
+  --chip-roam-bg: #1b2e47;
+  --chip-roam: #96bff0;
+  color-scheme: dark;
+}
