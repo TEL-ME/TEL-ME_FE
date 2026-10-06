@@ -1,51 +1,59 @@
 import { useQuery } from '@tanstack/react-query'
 import { Fragment, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { adminUnansweredApi, type UnansweredType } from '../../api/admin'
 import { formatAdminTime } from '../../lib/date'
 import { Badge, Card, Chip, Empty, FilterSelect, Pager, TableHead } from './components/AdminUi'
 import { PERIODS, periodFrom, type Period } from './periods'
 import SourceRows from './SourceRows'
 
-const TYPES = [
-  ['ALL', '전체'],
+const TYPES: [UnansweredType, string][] = [
   ['NO_EVIDENCE', '근거 없음'],
   ['OUT_OF_SCOPE', '범위 밖'],
   ['FAILED', '실패'],
   ['TIMEOUT', '시간 초과'],
-] as const
+]
 const typeLabel = (t: string) => TYPES.find(([k]) => k === t)?.[1] ?? t
 const typeTone = (t: string) => (t === 'NO_EVIDENCE' ? 'brand' : t === 'OUT_OF_SCOPE' ? 'notice' : 'danger') as 'brand' | 'notice' | 'danger'
 
 const COLS = '110px 100px minmax(0,1fr) 96px'
 
-/** 답 못 한 질문 — 근거가 없던 질문은 바로 FAQ로 추가할 수 있다 */
+/** 주소의 ?types=FAILED,TIMEOUT 을 읽는다 (대시보드 "실패한 답변"에서 들어올 때) */
+const readTypes = (raw: string | null): UnansweredType[] =>
+  (raw ?? '').split(',').filter((t): t is UnansweredType => TYPES.some(([k]) => k === t))
+
+/** 답 못 한 질문 — 유형은 여러 개 고를 수 있다(비우면 전체). 근거가 없던 질문은 바로 FAQ로 추가할 수 있다 */
 export default function UnansweredPanel() {
-  const [type, setType] = useState<UnansweredType | 'ALL'>('ALL')
+  const [params] = useSearchParams()
+  const [types, setTypes] = useState<UnansweredType[]>(() => readTypes(params.get('types')))
   const [period, setPeriod] = useState<Period>('7')
   const [page, setPage] = useState(0)
   const [openId, setOpenId] = useState<number | null>(null)
 
-  const query = { type: type === 'ALL' ? undefined : type, from: periodFrom(period), page, size: 20 }
-  const list = useQuery({ queryKey: ['admin', 'unanswered', query], queryFn: () => adminUnansweredApi.list(query) })
+  const query = { types, from: periodFrom(period), page, size: 20 }
+  const list = useQuery({ queryKey: ['admin', 'unanswered', query], queryFn: () => adminUnansweredApi.listByTypes(query) })
+
+  /** 유형 칩: 전체를 누르면 모두 해제, 나머지는 켜고 끈다. 다 켜지면 전체로 본다 */
+  const pickTypes = (next: UnansweredType[]) => {
+    setTypes(next.length === TYPES.length ? [] : TYPES.map(([k]) => k).filter((k) => next.includes(k)))
+    setPage(0)
+    setOpenId(null)
+  }
+  const toggleType = (t: UnansweredType) => pickTypes(types.includes(t) ? types.filter((x) => x !== t) : [...types, t])
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[13px] font-bold text-ink-sub">유형</span>
+        <Chip on={types.length === 0} onClick={() => pickTypes([])}>
+          전체
+        </Chip>
         {TYPES.map(([k, label]) => (
-          <Chip
-            key={k}
-            on={type === k}
-            onClick={() => {
-              setType(k)
-              setPage(0)
-              setOpenId(null)
-            }}
-          >
+          <Chip key={k} on={types.includes(k)} onClick={() => toggleType(k)}>
             {label}
           </Chip>
         ))}
+        <span className="ml-1 text-xs text-ink-muted">여러 개 고를 수 있어요</span>
       </div>
       <div className="flex flex-wrap items-center gap-4">
         <FilterSelect

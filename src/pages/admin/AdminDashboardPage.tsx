@@ -53,7 +53,7 @@ export default function AdminDashboardPage() {
   const stats = [
     { label: '답 못 한 질문', value: unansweredWeek.data?.totalElements, note: 'FAQ 추가가 필요한 질문이에요 · 최근 7일', to: '/admin/quality?tab=unanswered' },
     { label: '미처리 오류 신고', value: feedback.data?.totalElements, note: '아직 처리하지 않은 신고예요 · 전체 기간', to: '/admin/quality' },
-    { label: '실패한 답변', value: failed.data, note: '생성 실패·시간 초과 · 최근 7일', to: '/admin/quality?tab=unanswered' },
+    { label: '실패한 답변', value: failed.data, note: '생성 실패·시간 초과 · 최근 7일', to: '/admin/quality?tab=unanswered&types=FAILED,TIMEOUT' },
   ]
 
   return (
