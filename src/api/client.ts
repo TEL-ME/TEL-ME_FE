@@ -15,7 +15,9 @@ export class ApiError extends Error {
   }
 }
 
-type Query = Record<string, string | number | boolean | null | undefined>
+type QueryValue = string | number | boolean | null | undefined
+/** 배열은 같은 이름을 반복해 보낸다 (예: serviceTypes=NEW_LINE&serviceTypes=PORT_IN) */
+type Query = Record<string, QueryValue | readonly (string | number)[]>
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -29,7 +31,9 @@ export function apiUrl(path: string, query?: Query): string {
   if (!query) return url
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== null) params.set(key, String(value))
+    if (value === undefined || value === null) continue
+    if (Array.isArray(value)) value.forEach((v) => params.append(key, String(v)))
+    else params.set(key, String(value))
   }
   const qs = params.toString()
   return qs ? `${url}?${qs}` : url
