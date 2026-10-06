@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { formatDistance } from '../../stores/format'
 
 /**
  * 매장 추천 답변(STORE_RESULT)의 매장 카드.
@@ -26,8 +27,6 @@ function normalize(raw: Record<string, unknown>): StoreSnapshot {
   }
 }
 
-const formatDistance = (m: number) => (m < 1000 ? `${Math.round(m / 10) * 10}m` : `${(m / 1000).toFixed(1)}km`)
-
 export default function StoreResults({ items }: { items: Record<string, unknown>[] }) {
   const stores = items.map(normalize).filter((s) => s.name)
   if (stores.length === 0) return null
@@ -38,7 +37,7 @@ export default function StoreResults({ items }: { items: Record<string, unknown>
       {stores.map((s, i) => (
         <Link
           key={s.storeId ?? i}
-          to={s.storeId ? `/stores?storeId=${s.storeId}` : '/stores'}
+          to={s.storeId ? `/stores/${s.storeId}` : '/stores'}
           className="flex items-center gap-2 rounded-xl bg-surface-2 py-2.5 pl-3 pr-2.5 text-ink no-underline"
         >
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
