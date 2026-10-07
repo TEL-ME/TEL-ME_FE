@@ -11,6 +11,12 @@ import type {
 
 const BASE = '/api/v1/chat'
 
+/** 질문과 함께 보내는 현재 위치 */
+export interface ChatCoordinates {
+  latitude: number
+  longitude: number
+}
+
 export const chatApi = {
   /** 첫 질문을 보낼 때 만든다 (메인·새 대화 화면에는 sessionId가 없다) */
   createSession: (title?: string) => api<ChatSession>(`${BASE}/sessions`, { method: 'POST', body: { title } }),
@@ -21,8 +27,15 @@ export const chatApi = {
   getMessages: (sessionId: number, beforeSequenceNo?: number, size = 20) =>
     api<ChatMessageHistory>(`${BASE}/sessions/${sessionId}/messages`, { query: { beforeSequenceNo, size } }),
 
-  sendMessage: (sessionId: number, content: string) =>
-    api<ChatMessageSendResponse>(`${BASE}/sessions/${sessionId}/messages`, { method: 'POST', body: { content } }),
+  /**
+   * coords는 사용자가 "현재 위치 사용"을 눌렀을 때만 넣는다 (TELME-103).
+   * 위도·경도는 둘 다 보내거나 둘 다 보내지 않아야 한다. 서버는 검색에만 쓰고 대화 기록에 남기지 않는다.
+   */
+  sendMessage: (sessionId: number, content: string, coords?: ChatCoordinates) =>
+    api<ChatMessageSendResponse>(`${BASE}/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: coords ? { content, latitude: coords.latitude, longitude: coords.longitude } : { content },
+    }),
 
   /**
    * 실패한 답변 다시 생성 (전용 API, 백엔드에 요청 예정 — 경로는 가안).

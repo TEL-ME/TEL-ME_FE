@@ -1,13 +1,16 @@
 import { CircleCheck, RotateCw } from 'lucide-react'
+import type { ChatCoordinates } from '../../../api/chat'
 import type { ChatMessage } from '../../../api/types'
 import FeedbackButtons from '../../feedback/FeedbackButtons'
 import { isBusy, type ChatStatus } from '../chatRunStore'
 import AnswerText from './AnswerText'
 import { BotBubble, UserBubble, type BotTone } from './Bubbles'
 import FollowUps from './FollowUps'
+import LocationAskChips from './LocationAskChips'
 import SourceList from './SourceList'
 import StoreResults from './StoreResults'
 import { foldRetried } from '../foldRetried'
+import { isLocationAsk } from '../storeAsk'
 import ThinkingDots from './ThinkingDots'
 
 interface MessageListProps {
@@ -19,7 +22,10 @@ interface MessageListProps {
   typingMessageId: number | null
   errorMessage: string | null
   onTyped: () => void
-  onAsk: (question: string) => void
+  /** coords는 "현재 위치 사용"으로 보낼 때만 있다 */
+  onAsk: (question: string, coords?: ChatCoordinates) => void
+  /** 종료된 대화: 빠른 답 버튼을 보여 주지 않는다 */
+  closed?: boolean
   /** 상담 종료 (가장 최근 답변 오른쪽 아래 버튼). 종료된 대화면 undefined */
   onEndConsult?: () => void
   /** failedMessageId가 null이면 질문이 서버에 저장되기 전에 실패한 경우 */
@@ -57,6 +63,7 @@ export default function MessageList({
   onAsk,
   onRetry,
   onEndConsult,
+  closed = false,
 }: MessageListProps) {
   const busy = isBusy(status)
   const sorted = foldRetried(
@@ -143,13 +150,18 @@ export default function MessageList({
               ) : undefined
             }
             after={
-              showExtras && m.messageId === lastAnswerId && m.followUps?.length ? (
+              !showExtras || m.messageId !== lastAnswerId ? undefined : isLocationAsk(m) && !closed ? (
+                // 어느 지역인지 되물었을 때: 현재 위치로 답하거나 지도에서 직접 찾는다
+                <LocationAskChips disabled={busy} onAsk={onAsk} />
+              ) : m.followUps?.length ? (
                 <FollowUps items={m.followUps} disabled={busy} onAsk={onAsk} />
               ) : undefined
             }
           >
             <AnswerText text={m.content ?? ''} typing={typing} onTyped={onTyped} />
-            {showExtras && m.storeResults && m.storeResults.length > 0 && <StoreResults items={m.storeResults} />}
+            {showExtras && m.storeResults && m.storeResults.length > 0 && (
+              <StoreResults items={m.storeResults} context={m.storeSearchContext} />
+            )}
             {showExtras && m.messageType === 'ANSWER' && m.answerBasis === 'GROUNDED' && (
               <SourceList messageId={m.messageId} />
             )}

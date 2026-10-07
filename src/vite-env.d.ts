@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_PROXY_TARGET?: string
   readonly VITE_ENABLE_MSW?: string
   readonly VITE_RETRY_API?: string
+  readonly VITE_CHAT_GPS?: string
   readonly VITE_KAKAO_MAP_KEY?: string
 }
 

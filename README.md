@@ -16,4 +16,4 @@ http://localhost:3000 에서 열립니다.
 - 백엔드 API 서버가 http://localhost:8080에서 떠 있어야 합니다. `/api` 요청은 개발 서버가 백엔드로 넘깁니다(프록시).
 - 처음 한 번 `cp .env.example .env.local`로 환경변수 파일을 만듭니다.
 - 백엔드에 아직 없는 API는 개발 모드에서 MSW가 가짜로 응답합니다(`src/mocks/handlers.ts`).
-- 매장 지도는 카카오 지도를 씁니다. `.env.local`의 `VITE_KAKAO_MAP_KEY`에 카카오 JavaScript 키를 넣고, 카카오 개발자 콘솔의 플랫폼 > Web에 `http://localhost:3000`을 등록합니다. 키가 없으면 간이 지도로 보입니다.
+- 매장 지도는 카카오 지도를 씁니다. `.env.local`의 `VITE_KAKAO_MAP_KEY`에 카카오 JavaScript 키를 넣고, 카카오 개발자 콘솔에서 그 키(앱 > 플랫폼 키 > JavaScript 키)의 JavaScript SDK 도메인에 `http://localhost:3000`을 등록하고, 카카오맵 > 사용 설정을 ON으로 둡니다. 키가 없으면 간이 지도로 보입니다.

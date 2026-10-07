@@ -1,7 +1,7 @@
 import { ChevronUp } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { chatApi } from '../api/chat'
+import { chatApi, type ChatCoordinates } from '../api/chat'
 import { ApiError } from '../api/client'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { CharacterStage, type MudoStatus } from '../components/CharacterStage'
@@ -34,6 +34,7 @@ import { sessionsKey, useSessions } from '../features/chat/sessionQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '../stores/toastStore'
 import { useChatScroll } from '../features/chat/useChatScroll'
+import { isLocationAsk } from '../features/chat/storeAsk'
 
 const MUDO_BY_STATUS: Record<ChatStatus, MudoStatus> = {
   idle: 'idle',
@@ -112,9 +113,9 @@ export default function ChatPage() {
     else openDislikeSheet(target)
   }, [isUser, activeId, history, messages])
 
-  const ask = (question: string) => {
+  const ask = (question: string, coords?: ChatCoordinates) => {
     toBottom()
-    void sendQuestion(question, (id) => navigate(`/chat/${id}`))
+    void sendQuestion(question, (id) => navigate(`/chat/${id}`), coords)
   }
 
   // 다른 화면에서 질문을 들고 온 경우 (예: 마이 → 무러바라에게 요금제 물어보기) 한 번만 보낸다
@@ -161,7 +162,7 @@ export default function ChatPage() {
   const placeholder =
     lastAssistant?.messageType !== 'CLARIFICATION'
       ? undefined
-      : /매장|지역|위치|근처|동네|어디/.test(lastAssistant.content ?? '')
+      : isLocationAsk(lastAssistant)
         ? '예: 강남역 근처, 마포구'
         : '무러바라가 물어본 내용을 알려 주세요'
 
@@ -234,6 +235,7 @@ export default function ChatPage() {
                 onAsk={ask}
                 onRetry={retry}
               onEndConsult={closed || ending ? undefined : () => setConfirmEnd(true)}
+                closed={closed}
               />
               </>
             ) : (
