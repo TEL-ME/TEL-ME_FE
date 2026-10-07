@@ -19,6 +19,9 @@ import OAuthCallbackPage from '../pages/OAuthCallbackPage'
 import Placeholder from '../pages/Placeholder'
 import SettingsPage from '../pages/SettingsPage'
 import SignupPage from '../pages/SignupPage'
+import StoreDetailPage from '../pages/StoreDetailPage'
+import StoreRegionPage from '../pages/StoreRegionPage'
+import StoresPage from '../pages/StoresPage'
 
 export const router = createBrowserRouter([
   {
@@ -27,7 +30,10 @@ export const router = createBrowserRouter([
       // 메인과 대화는 같은 채팅 화면. 첫 질문을 보내면 /chat/:sessionId로 바뀐다
       { path: '/', element: <ChatPage /> },
       { path: '/chat/:sessionId', element: <ChatPage /> },
-      { path: '/stores', element: <Placeholder title="매장" note="구현 예정" /> },
+      // 매장: 지도 + 목록 → 지역으로 찾기 · 매장 상세
+      { path: '/stores', element: <StoresPage /> },
+      { path: '/stores/region', element: <StoreRegionPage /> },
+      { path: '/stores/:storeId', element: <StoreDetailPage /> },
       { path: '/my', element: <MyPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/terms', element: <Placeholder title="이용약관" note="내용 준비 중" /> },
