@@ -1,5 +1,5 @@
 import { ChevronRight, MapIcon, MapPin } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { StoreSearchContext } from '../../../api/types'
 import { formatDistance, formatRadius } from '../../stores/format'
 import type { StoreListItem } from '../../stores/queries'
@@ -56,6 +56,8 @@ interface StoreResultsProps {
   items: Record<string, unknown>[]
   /** 매장을 찾은 기준. 예전 메시지에는 없다 */
   context?: StoreSearchContext | null
+  /** 종료된 대화: 더 물을 수 없으니 "다른 지역으로 찾기"가 매장 탭으로 간다 */
+  closed?: boolean
 }
 
 /** 카드 목록 위 제목: 어디를 기준으로 찾았는지 (예: 현재 위치 기준 · 반경 10km). 지역 전체 검색은 반경이 없다 */
@@ -65,8 +67,9 @@ function contextTitle(context: StoreSearchContext): string {
 
 const action = 'flex min-h-9 items-center gap-1.5 rounded-full bg-surface-2 px-3.5 text-[13px] font-bold text-ink no-underline'
 
-export default function StoreResults({ items, context }: StoreResultsProps) {
+export default function StoreResults({ items, context, closed = false }: StoreResultsProps) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const stores = items.map(normalize).filter((s) => s.name)
   if (stores.length === 0) return null
   const hasDistance = stores.some((s) => s.distanceMeters != null)
@@ -128,7 +131,8 @@ export default function StoreResults({ items, context }: StoreResultsProps) {
             지도로 보기
           </button>
         )}
-        <Link to="/stores/region" className={action}>
+        {/* 지역을 고르면 그 지역 매장을 이 대화에 다시 묻는다 (askChat: 질문을 보낼 대화 주소) */}
+        <Link to="/stores/region" state={closed ? undefined : { askChat: pathname }} className={action}>
           다른 지역으로 찾기
         </Link>
       </div>

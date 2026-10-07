@@ -160,7 +160,7 @@ export default function MessageList({
           >
             <AnswerText text={m.content ?? ''} typing={typing} onTyped={onTyped} />
             {showExtras && m.storeResults && m.storeResults.length > 0 && (
-              <StoreResults items={m.storeResults} context={m.storeSearchContext} />
+              <StoreResults items={m.storeResults} context={m.storeSearchContext} closed={closed} />
             )}
             {showExtras && m.messageType === 'ANSWER' && m.answerBasis === 'GROUNDED' && (
               <SourceList messageId={m.messageId} />

@@ -103,7 +103,8 @@ export default function StoresPage() {
     box.scrollTo({ top: box.scrollTop + offset - 2, behavior: 'smooth' })
   }, [selectedId])
 
-  const openRegion = () => navigate('/stores/region')
+  // fromStores: 지역을 고른 뒤 이 화면으로 "뒤로" 돌아오면 된다는 표시
+  const openRegion = () => navigate('/stores/region', { state: { fromStores: true } })
 
   const searchHere = () => {
     if (!moved) return
