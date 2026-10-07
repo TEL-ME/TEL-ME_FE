@@ -35,6 +35,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '../stores/toastStore'
 import { useChatScroll } from '../features/chat/useChatScroll'
 import { isLocationAsk } from '../features/chat/storeAsk'
+import { takeHandedQuestion } from '../features/chat/askHandoff'
 
 const MUDO_BY_STATUS: Record<ChatStatus, MudoStatus> = {
   idle: 'idle',
@@ -127,6 +128,15 @@ export default function ChatPage() {
     void sendQuestion(carried, (id) => navigate(`/chat/${id}`))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carried])
+
+  // 지역 선택 화면에서 고른 지역을 질문으로 넘겨받은 경우 (매장 안내의 "다른 지역으로 찾기") 한 번만 보낸다
+  useEffect(() => {
+    const handed = takeHandedQuestion(location.pathname)
+    if (!handed) return
+    toBottom()
+    void sendQuestion(handed, (id) => navigate(`/chat/${id}`))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
 
   const retry = (question: string, failedMessageId: number | null) => {
     toBottom()
