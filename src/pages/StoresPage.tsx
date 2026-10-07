@@ -6,6 +6,7 @@ import StoreEmpty from '../features/stores/components/StoreEmpty'
 import StoreMap from '../features/stores/components/StoreMap'
 import { formatDistance, type LatLng } from '../features/stores/format'
 import { hasKakaoKey } from '../features/stores/kakao/loadKakao'
+import { canLocate, locateErrorMessage, locateMe } from '../features/stores/locate'
 import { useServiceTypes, useStoreList } from '../features/stores/queries'
 import {
   clearServices,
@@ -32,6 +33,7 @@ const pill = 'h-10 rounded-full bg-surface px-3.5 text-sm font-semibold text-ink
 function titleOf(origin: SearchOrigin): string {
   if (origin.kind === 'near') return '가까운 매장'
   if (origin.kind === 'region') return `${origin.label} 매장`
+  if (origin.kind === 'chat') return '상담에서 찾은 매장'
   return origin.label ? `${origin.label} 주변 매장` : '이 지역 매장'
 }
 
@@ -111,41 +113,34 @@ export default function StoresPage() {
     setOrigin(next)
   }
 
-  const locate = () => {
+  const locate = async () => {
     setAskLocation(false)
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false)
-        setMoved(null)
-        searchNearMe({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-      },
-      (err) => {
-        setLocating(false)
-        showToast(
-          err.code === err.PERMISSION_DENIED
-            ? '위치 권한이 꺼져 있어요. 지역으로 찾아보세요'
-            : '현재 위치를 찾지 못했어요. 잠시 후 다시 시도해 주세요',
-        )
-      },
-      { timeout: 10_000, maximumAge: 60_000 },
-    )
+    try {
+      const here = await locateMe()
+      setMoved(null)
+      searchNearMe(here)
+    } catch (error) {
+      showToast(locateErrorMessage(error, '위치 권한이 꺼져 있어요. 지역으로 찾아보세요'))
+    } finally {
+      setLocating(false)
+    }
   }
 
   /** 현재 위치 버튼. 이미 허용했으면 바로 찾고, 아니면 먼저 묻는다 */
   const onLocate = async () => {
-    if (!('geolocation' in navigator)) {
+    if (!canLocate()) {
       showToast('이 브라우저에서는 현재 위치를 쓸 수 없어요')
       return
     }
-    if (me) return locate()
+    if (me) return void locate()
     let granted = false
     try {
       granted = (await navigator.permissions?.query({ name: 'geolocation' }))?.state === 'granted'
     } catch {
       // 권한 상태를 알려 주지 않는 브라우저는 물어본다
     }
-    if (granted) locate()
+    if (granted) void locate()
     else setAskLocation(true)
   }
 
@@ -180,7 +175,9 @@ export default function StoresPage() {
       : '지역으로 찾기'
     : origin.kind === 'near'
       ? '내 주변'
-      : (origin.label ?? '지도에서 고른 위치')
+      : origin.kind === 'chat'
+        ? '상담에서 찾은 매장'
+        : (origin.label ?? '지도에서 고른 위치')
 
   const count = list.isPending
     ? ''
@@ -188,7 +185,9 @@ export default function StoresPage() {
       ? list.total != null
         ? `${list.total}곳`
         : `${list.items.length}곳${list.hasMore ? ' 이상' : ''}`
-      : `가까운 순 ${list.items.length}곳`
+      : origin.kind === 'chat'
+        ? `${list.items.length}곳`
+        : `가까운 순 ${list.items.length}곳`
   const empty = emptyCopy(origin, services.length > 0)
   const hasDistance = list.items.some((s) => s.distanceMeters != null)
 
@@ -199,7 +198,7 @@ export default function StoresPage() {
         selectedId={selectedId}
         me={me}
         fitKey={fitKey}
-        anchor={origin.kind === 'region' ? null : origin.center}
+        anchor={origin.kind === 'near' || origin.kind === 'area' ? origin.center : null}
         bottomInset={bottomInset}
         topInset={TOP_INSET}
         label="매장 지도"
@@ -274,7 +273,11 @@ export default function StoresPage() {
           <span className="shrink-0 text-xs font-semibold text-ink-muted">{count}</span>
         </div>
 
-        {serviceTypes.data && serviceTypes.data.length > 0 && (
+        {origin.kind === 'chat' ? (
+          <p className="shrink-0 px-5 pb-2 text-xs leading-4 text-ink-muted">
+            상담에서 안내받은 매장이에요. 다른 매장은 위 검색창이나 현재 위치 버튼으로 찾아보세요.
+          </p>
+        ) : serviceTypes.data && serviceTypes.data.length > 0 ? (
           <>
             <div role="group" aria-label="업무 선택" className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-1.5">
               {serviceTypes.data.map((t) => {
@@ -298,7 +301,7 @@ export default function StoresPage() {
               {services.length > 1 ? '고른 업무가 모두 가능한 매장만 보여요' : '업무를 여러 개 고를 수 있어요'}
             </p>
           </>
-        )}
+        ) : null}
 
         <div ref={listRef} className="no-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-4 pt-0.5">
           {list.isPending ? (
@@ -375,7 +378,7 @@ export default function StoresPage() {
               )}
               {hasDistance && (
                 <p className="mt-0.5 text-center text-xs leading-[18px] text-ink-muted">
-                  거리는 내 위치에서 잰 직선거리예요. 실제 이동 거리와 달라요.
+                  거리는 {origin.kind === 'chat' ? origin.label : '내 위치'}에서 잰 직선거리예요. 실제 이동 거리와 달라요.
                 </p>
               )}
             </>
@@ -385,7 +388,7 @@ export default function StoresPage() {
 
       <LocationDialog
         open={askLocation}
-        onAllow={locate}
+        onAllow={() => void locate()}
         onRegion={() => {
           setAskLocation(false)
           openRegion()

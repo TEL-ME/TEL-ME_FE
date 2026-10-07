@@ -43,12 +43,14 @@ export interface StoreListItem {
  * 검색 기준(origin)에 맞는 API를 골라 매장 목록을 만든다.
  * - near · area: GET /stores/nearby (가까운 순, 최대 20곳)
  * - region: GET /stores/region (매장 번호순, 20곳씩 더 보기)
+ * - chat: 상담에서 받은 매장을 그대로 쓴다 (API를 부르지 않는다)
  *
  * 지역 검색은 업무를 하나만 받는다. 여러 개를 고르면 첫 번째만 서버에 보내고 나머지는 받은 결과에서 거른다.
  */
 export function useStoreList(origin: SearchOrigin, services: ServiceTypeCode[], me: LatLng | null) {
   const isRegion = origin.kind === 'region'
-  const center = isRegion ? null : origin.center
+  const fixedStores = origin.kind === 'chat' ? origin.stores : null
+  const center = origin.kind === 'near' || origin.kind === 'area' ? origin.center : null
   const radiusMeters = origin.kind === 'area' ? origin.radiusMeters : undefined
 
   const nearby = useQuery({
@@ -58,7 +60,7 @@ export function useStoreList(origin: SearchOrigin, services: ServiceTypeCode[], 
         { latitude: center!.lat, longitude: center!.lng, radiusMeters, limit: NEARBY_LIMIT, serviceTypes: services },
         signal,
       ),
-    enabled: !isRegion,
+    enabled: center != null,
     placeholderData: keepPreviousData,
   })
 
@@ -80,6 +82,7 @@ export function useStoreList(origin: SearchOrigin, services: ServiceTypeCode[], 
 
   // 지도가 핀을 다시 그리지 않도록, 받은 결과가 바뀔 때만 목록을 새로 만든다
   const items = useMemo<StoreListItem[]>(() => {
+    if (fixedStores) return fixedStores
     const distanceFromMe = (s: { latitude: number; longitude: number }) =>
       me ? distanceMeters(me, { lat: s.latitude, lng: s.longitude }) : null
     const base = (s: { storeId: number; name: string; address: string; latitude: number; longitude: number }) => ({
@@ -102,7 +105,7 @@ export function useStoreList(origin: SearchOrigin, services: ServiceTypeCode[], 
       ...base(s),
       distanceMeters: measureFromOrigin ? s.distanceMeters : distanceFromMe(s),
     }))
-  }, [isRegion, regionPages, nearbyStores, restKey, measureFromOrigin, me])
+  }, [fixedStores, isRegion, regionPages, nearbyStores, restKey, measureFromOrigin, me])
 
   // 화면에서 거르다 보면 한 페이지에 몇 곳 안 남을 수 있다. 목록이 너무 짧으면 다음 페이지를 이어서 받는다
   const { hasNextPage, isFetching: regionFetching, fetchNextPage } = region
@@ -111,6 +114,19 @@ export function useStoreList(origin: SearchOrigin, services: ServiceTypeCode[], 
     if (tooShort) void fetchNextPage()
   }, [tooShort, fetchNextPage])
 
+  if (fixedStores) {
+    return {
+      items,
+      total: items.length,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      refetch: () => {},
+      hasMore: false,
+      isFetchingMore: false,
+      fetchMore: () => {},
+    }
+  }
   if (isRegion) {
     return {
       items,

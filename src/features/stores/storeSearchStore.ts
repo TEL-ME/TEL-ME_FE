@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ServiceTypeCode } from '../../api/stores'
 import type { LatLng } from './format'
+import type { StoreListItem } from './queries'
 import { DEFAULT_SIDO } from './regions'
 
 /**
@@ -8,11 +9,13 @@ import { DEFAULT_SIDO } from './regions'
  * - region: 지역(법정동코드 앞자리). 처음 들어오면 서울
  * - near: 내 위치에서 가까운 순
  * - area: 지도에서 고른 곳(다시 검색) 또는 검색한 장소 주변
+ * - chat: 상담에서 안내받은 매장을 그대로 지도에 올린다 (다시 찾지 않는다)
  */
 export type SearchOrigin =
   | { kind: 'region'; code: string; label: string; /** 처음 들어왔을 때 자동으로 고른 지역 */ auto?: boolean }
   | { kind: 'near'; center: LatLng }
   | { kind: 'area'; center: LatLng; radiusMeters: number; label?: string }
+  | { kind: 'chat'; /** 거리를 잰 기준 이름 (예: 현재 위치, 강남역) */ label: string; stores: StoreListItem[] }
 
 interface StoreSearchState {
   origin: SearchOrigin
@@ -42,6 +45,16 @@ export function setOrigin(origin: SearchOrigin) {
 
 export function searchNearMe(me: LatLng) {
   useStoreSearch.setState({ me, origin: { kind: 'near', center: me }, selectedId: null, sheetFull: false })
+}
+
+/** 상담 답변의 "지도로 보기": 안내받은 매장만 지도에 올린다 */
+export function showStoresFromChat(label: string, stores: StoreListItem[]) {
+  useStoreSearch.setState({ origin: { kind: 'chat', label, stores }, services: [], selectedId: null, sheetFull: false })
+}
+
+/** 다른 화면(상담)에서 받은 내 위치를 매장 화면에서도 쓴다 */
+export function rememberMe(me: LatLng) {
+  useStoreSearch.setState({ me })
 }
 
 export function toggleService(code: ServiceTypeCode) {

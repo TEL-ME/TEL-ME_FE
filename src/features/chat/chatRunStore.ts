@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { chatApi, subscribeExecution } from '../../api/chat'
+import { chatApi, subscribeExecution, type ChatCoordinates } from '../../api/chat'
 import { ApiError } from '../../api/client'
 import { queryClient } from '../../lib/queryClient'
 import { fetchMessages, messagesKey } from './queries'
@@ -42,6 +42,8 @@ const get = useChatRun.getState
 const set = useChatRun.setState
 
 let stopStream: (() => void) | null = null
+/** 현재 위치와 함께 보낸 마지막 질문. "다시 시도"로 같은 질문을 다시 보낼 때만 위치를 다시 붙인다 */
+let lastLocated: { content: string; coords: ChatCoordinates } | null = null
 let reconnectTries = 0
 const MAX_RECONNECT = 3
 
@@ -62,6 +64,7 @@ const refreshMessages = (sessionId: number) => {
 export function attachSession(sessionId: number | null) {
   if (get().sessionId === sessionId) return
   closeStream()
+  lastLocated = null
   set({ ...initial, sessionId })
 }
 
@@ -122,10 +125,16 @@ export function resumeExecution(sessionId: number, executionId: number) {
 
 /**
  * 질문 보내기. 메인(새 대화)에서는 이때 세션을 만들고 onSessionCreated로 주소를 바꾼다 (문서 2. 채팅 세션 생성)
+ * coords는 "현재 위치 사용"을 눌러 보낼 때만 준다.
  */
-export async function sendQuestion(question: string, onSessionCreated?: (sessionId: number) => void) {
+export async function sendQuestion(
+  question: string,
+  onSessionCreated?: (sessionId: number) => void,
+  coords?: ChatCoordinates,
+) {
   const content = question.trim()
   if (!content || isBusy(get().status)) return
+  lastLocated = coords ? { content, coords } : null
 
   set({ status: 'sending', pendingQuestion: content, typingMessageId: null, errorMessage: null })
   let sessionId = get().sessionId
@@ -136,7 +145,7 @@ export async function sendQuestion(question: string, onSessionCreated?: (session
       set({ sessionId })
       onSessionCreated?.(sessionId)
     }
-    const sent = await chatApi.sendMessage(sessionId, content)
+    const sent = await chatApi.sendMessage(sessionId, content, coords)
     if (get().sessionId !== sessionId) return
     await refreshMessages(sessionId)
     set({ pendingQuestion: null })
@@ -182,7 +191,8 @@ export async function retryAnswer(
   if (isBusy(get().status)) return
   const sessionId = get().sessionId
   if (!RETRY_API_ENABLED || sessionId == null || failedMessageId == null) {
-    return sendQuestion(question, onSessionCreated)
+    const coords = lastLocated?.content === question.trim() ? lastLocated.coords : undefined
+    return sendQuestion(question, onSessionCreated, coords)
   }
   set({ status: 'sending', typingMessageId: null, errorMessage: null })
   try {

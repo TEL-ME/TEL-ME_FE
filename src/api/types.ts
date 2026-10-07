@@ -37,6 +37,31 @@ export interface MyFeedback {
   comment: string | null
 }
 
+/**
+ * 매장 안내 답변에 담기는 매장 한 곳 (백엔드 ChatStoreResponse, TELME-103).
+ * 예전에 저장된 메시지는 일부 값이 없을 수 있어서 화면에서는 있는 값만 골라 쓴다.
+ */
+export interface ChatStoreSnapshot {
+  storeId: number
+  name: string
+  address: string
+  phone: string | null
+  /** 매장 좌표 (검색한 곳의 좌표가 아니다) */
+  latitude: number
+  longitude: number
+  /** 검색 기준점에서의 직선거리. 지역 전체 검색이면 null */
+  distanceMeters: number | null
+}
+
+/** 매장을 어떤 기준으로 찾았는지 (백엔드 ChatStoreSearchContextResponse) */
+export interface StoreSearchContext {
+  type: 'CURRENT_LOCATION' | 'REGION' | 'ADDRESS' | 'PLACE'
+  /** 검색 기준 이름. 현재 위치로 찾았으면 "현재 위치" */
+  label: string
+  /** 실제로 찾은 반경. 지역 전체 검색이면 null */
+  radiusMeters: number | null
+}
+
 export interface ChatMessage {
   messageId: number
   sequenceNo: number
@@ -52,6 +77,8 @@ export interface ChatMessage {
   completedAt: string | null
   ratable: boolean
   myFeedback: MyFeedback | null
+  /** 매장을 찾은 기준. 매장 검색이 아니거나 예전 메시지면 없다 */
+  storeSearchContext?: StoreSearchContext | null
 }
 
 export interface ChatMessageHistory {
