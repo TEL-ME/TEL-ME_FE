@@ -12,6 +12,12 @@ export function formatDistance(meters: number): string {
   return `${Math.round(meters / 1000)}km`
 }
 
+/** 검색 반경 표시: 500m · 3km · 2.5km */
+export function formatRadius(meters: number): string {
+  if (meters < 1000) return `${meters}m`
+  return `${Number((meters / 1000).toFixed(1))}km`
+}
+
 /** 두 좌표 사이 직선거리(m). 백엔드 distanceMeters와 같은 뜻이다 */
 export function distanceMeters(a: LatLng, b: LatLng): number {
   const R = 6_371_000

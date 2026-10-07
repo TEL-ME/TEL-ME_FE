@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { dayOfWeekOf, distanceMeters, districtName, formatDistance, hoursText, telHref, toRegionCode } from './format'
+import {
+  dayOfWeekOf,
+  distanceMeters,
+  districtName,
+  formatDistance,
+  formatRadius,
+  hoursText,
+  telHref,
+  toRegionCode,
+} from './format'
 
 describe('formatDistance', () => {
   it('1km 미만은 m, 그 이상은 km로 보여 준다', () => {
@@ -9,6 +18,15 @@ describe('formatDistance', () => {
     expect(formatDistance(1000)).toBe('1.0km')
     expect(formatDistance(2360)).toBe('2.4km')
     expect(formatDistance(318_120)).toBe('318km')
+  })
+})
+
+describe('formatRadius', () => {
+  it('km로 떨어지면 소수점 없이 보여 준다', () => {
+    expect(formatRadius(500)).toBe('500m')
+    expect(formatRadius(3000)).toBe('3km')
+    expect(formatRadius(2500)).toBe('2.5km')
+    expect(formatRadius(10000)).toBe('10km')
   })
 })
 
