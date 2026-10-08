@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
+import AddEmailLoginPage from '../pages/AddEmailLoginPage'
 import AppLayout from '../layouts/AppLayout'
 import AdminLoginPage from '../pages/AdminLoginPage'
 import AdminLayout from '../features/admin/AdminLayout'
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
   // 하단 메뉴 없는 화면
   { path: '/auth/login', element: <EmailLoginPage /> },
   { path: '/auth/signup', element: <SignupPage /> },
+  { path: '/settings/email-login', element: <AddEmailLoginPage /> },
   { path: '/oauth/callback', element: <OAuthCallbackPage /> },
   { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/intro', element: <IntroPage /> },

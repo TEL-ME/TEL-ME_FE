@@ -5,12 +5,12 @@ import { queryClient } from '../../lib/queryClient'
 import { attachSession } from '../chat/chatRunStore'
 
 export const meKey = ['auth', 'me'] as const
-const GUEST: Me = { userId: null, email: null, name: null, role: 'GUEST' }
+const GUEST: Me = { authenticated: false, userId: null, email: null, name: null, role: 'GUEST', loginMethods: [] }
 
 export function useMe() {
   const query = useQuery({ queryKey: meKey, queryFn: authApi.me, staleTime: 5 * 60_000 })
   const me = query.data ?? GUEST
-  return { me, isUser: me.role !== 'GUEST', isAdmin: me.role === 'ADMIN', isLoading: query.isPending }
+  return { me, isUser: me.authenticated, isAdmin: me.role === 'ADMIN', isLoading: query.isPending }
 }
 
 /** 로그인·가입 직후: 게스트 대화가 계정으로 옮겨지므로 대화 관련 캐시를 새로 읽는다 */

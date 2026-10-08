@@ -156,11 +156,15 @@ export interface LoginResponse {
   email: string
 }
 
-/** GET /api/v1/auth/me — 백엔드에 아직 없음(요청 예정). 지금은 MSW 가짜 응답 */
+export type LoginMethod = 'EMAIL' | 'KAKAO'
+
+/** GET /api/v1/auth/me — 로그인 안 했으면 200 + role GUEST */
 export interface Me {
+  authenticated: boolean
   userId: number | null
   email: string | null
-  /** 이메일 가입 때 받은 이름. 소셜 로그인은 아직 없음(백엔드 수정 보류) */
+  /** 이메일 가입 때 받은 이름, 카카오는 닉네임 */
   name: string | null
   role: 'GUEST' | 'USER' | 'ADMIN'
+  loginMethods: LoginMethod[]
 }

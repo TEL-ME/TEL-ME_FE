@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { LINK_FAIL_DEFAULT, LINK_FAIL_MESSAGE, takeKakaoLink } from '../features/auth/accountLink'
 import { openLoginSheet, takeLoginReturn } from '../features/auth/loginSheetStore'
 import { afterLogin } from '../features/auth/useAuth'
-import { recordMockLogin } from '../mocks/mockMe'
 import { showToast } from '../stores/toastStore'
 
 /** 백엔드가 카카오 로그인 후 보내는 곳: /oauth/callback?success=true|false&reason=... */
@@ -25,9 +25,20 @@ export default function OAuthCallbackPage() {
     const success = params.get('success') === 'true'
     const reason = params.get('reason') ?? ''
     const to = takeLoginReturn()
+    // 설정 › 카카오 연결하기에서 다녀온 경우
+    if (takeKakaoLink()) {
+      if (success) {
+        void afterLogin().then(() => {
+          showToast('카카오를 연결했어요. 이제 카카오로도 로그인할 수 있어요')
+          navigate(to, { replace: true })
+        })
+      } else {
+        navigate(to, { replace: true })
+        showToast(LINK_FAIL_MESSAGE[reason] ?? LINK_FAIL_DEFAULT)
+      }
+      return
+    }
     if (success) {
-      // /auth/me 생기기 전 임시: 카카오 로그인은 이메일을 받지 않아(scope: profile_nickname) 이메일 없이 기록
-      recordMockLogin({ userId: null, email: null })
       void afterLogin().then(() => {
         showToast('카카오로 로그인했어요')
         navigate(to, { replace: true })
