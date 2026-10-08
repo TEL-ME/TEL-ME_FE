@@ -1,15 +1,17 @@
 import { Activity, Gauge, ListTree, OctagonAlert, type LucideIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../features/admin/components/AdminUi'
+import LatencyPanel from '../../features/admin/system/LatencyPanel'
+import LlmErrorsPanel from '../../features/admin/system/LlmErrorsPanel'
 
-const TABS: { key: string; label: string; icon: LucideIcon; desc: string; api: string }[] = [
-  { key: 'errors', label: '오류 목록', icon: OctagonAlert, desc: '답변을 만들다 실패한 작업과 오류 종류, 시도 횟수를 보여드려요.', api: 'GET /api/v1/admin/system/errors' },
-  { key: 'latency', label: '응답 속도', icon: Gauge, desc: '첫 글자까지·답변이 끝날 때까지 걸린 시간을 작업별로 보여드려요.', api: 'GET /api/v1/admin/system/latency' },
+const TABS: { key: string; label: string; icon: LucideIcon; desc: string; api: string; ready?: boolean }[] = [
+  { key: 'errors', label: '오류 목록', icon: OctagonAlert, desc: '답변을 만들다 실패한 작업과 오류 종류, 시도 횟수를 보여드려요.', api: 'GET /api/v1/admin/system/errors', ready: true },
+  { key: 'latency', label: '응답 속도', icon: Gauge, desc: '첫 글자까지·답변이 끝날 때까지 걸린 시간을 작업별로 보여드려요.', api: 'GET /api/v1/admin/system/latency', ready: true },
   { key: 'scores', label: '검색 점수', icon: Activity, desc: 'FAQ 검색 점수 분포와 임계값을 넘은 비율을 보여드려요.', api: 'GET /api/v1/admin/system/search-scores' },
   { key: 'intents', label: '의도 분포', icon: ListTree, desc: '질문 의도(FAQ·매장·복합·미분류) 비율과 규칙·LLM 분류 비율을 보여드려요.', api: 'GET /api/v1/admin/system/intents' },
 ]
 
-/** 운영 상태 (시안 AdminSystem*). 통계 API가 생기기 전까지 메뉴와 탭만 두고 "구현 예정"으로 표시한다 */
+/** 운영 상태 (시안 AdminSystem*). 오류 목록·응답 속도는 연결됨, 검색 점수·의도 분포는 API가 생기기 전까지 "구현 예정" */
 export default function AdminSystemPage() {
   const [params, setParams] = useSearchParams()
   const tab = TABS.find((t) => t.key === params.get('tab')) ?? TABS[0]
@@ -20,7 +22,6 @@ export default function AdminSystemPage() {
       <PageHeader
         title="운영 상태"
         desc="답변을 만드는 과정이 잘 돌아가는지 봐요."
-        actions={<span className="rounded-full border border-dashed border-line px-2.5 py-1 text-xs font-bold text-ink-muted">구현 예정</span>}
       />
       <div role="tablist" aria-label="운영 상태" className="flex gap-1 border-b border-line">
         {TABS.map((t) => (
@@ -35,9 +36,13 @@ export default function AdminSystemPage() {
             }`}
           >
             {t.label}
+            {!t.ready && <span className="ml-1 text-[11px] font-semibold text-ink-muted">준비 중</span>}
           </button>
         ))}
       </div>
+      {tab.key === 'errors' && <LlmErrorsPanel />}
+      {tab.key === 'latency' && <LatencyPanel />}
+      {!tab.ready && (
       <section
         role="tabpanel"
         className="flex flex-col items-center gap-3 rounded-card border-[1.5px] border-dashed border-line bg-surface px-6 py-16 text-center"
@@ -53,6 +58,7 @@ export default function AdminSystemPage() {
           백엔드 통계 API가 생기면 연결해요 · <code className="rounded bg-surface-2 px-1.5 py-0.5">{tab.api}</code> (가안)
         </p>
       </section>
+      )}
     </>
   )
 }

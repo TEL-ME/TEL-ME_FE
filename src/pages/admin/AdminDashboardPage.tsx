@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
+import { RotateCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { adminFeedbackApi, adminUnansweredApi } from '../../api/admin'
-import { Badge, Card, Empty, PageHeader } from '../../features/admin/components/AdminUi'
+import { adminDashboardApi, adminFeedbackApi, adminUnansweredApi, mainQuestion, type DashboardDay } from '../../api/admin'
+import { Badge, Card, Empty, PageHeader, secondaryBtn } from '../../features/admin/components/AdminUi'
 import { daysAgoIso, formatAdminTime } from '../../lib/date'
 
 const REASON: Record<string, string> = {
@@ -18,10 +19,9 @@ const TYPE: Record<string, [string, 'brand' | 'notice' | 'danger']> = {
 
 /**
  * 대시보드 (시안 AdminDashboard). 들어오자마자 스크롤 없이 한눈에 보이게 한다.
- * - 숫자 카드: 최근 7일 건수. 미처리 오류 신고만 전체 기간 (처리 안 된 건 기간이 지나도 남아야 해서)
+ * - 숫자 카드: 요약 API 한 번. 답 못 한 질문·실패한 답변은 최근 7일, 미처리 오류 신고는 전체 기간, 오늘 질문 수는 어제와 비교
  * - 미리보기 목록: 기간 조건 없이 최신 5개
- * - 운영 상태 요약: 통계 API(하루 질문 수·오류 목록)가 연결되기 전까지 자리만 둔다
- * 숫자 카드는 백엔드 요약 API가 머지되면 그 API 하나로 바꾼다. "오늘 질문 수"도 그때 채운다.
+ * - 운영 상태 요약: 최근 7일 날짜별 질문·오류 수 막대그래프
  */
 export default function AdminDashboardPage() {
   const week = daysAgoIso(7)
@@ -30,35 +30,48 @@ export default function AdminDashboardPage() {
     queryKey: ['admin', 'dash', 'unanswered'],
     queryFn: () => adminUnansweredApi.list({ size: 5 }),
   })
-  // 카드 숫자는 최근 7일
-  const unansweredWeek = useQuery({
-    queryKey: ['admin', 'dash', 'unanswered-week', week],
-    queryFn: () => adminUnansweredApi.list({ from: week, size: 1 }),
-  })
   const feedback = useQuery({
     queryKey: ['admin', 'dash', 'feedback'],
     queryFn: () => adminFeedbackApi.list({ handled: 'UNHANDLED', size: 5 }),
   })
-  const failed = useQuery({
-    queryKey: ['admin', 'dash', 'failed', week],
-    queryFn: async () => {
-      const [f, t] = await Promise.all([
-        adminUnansweredApi.list({ type: 'FAILED', from: week, size: 1 }),
-        adminUnansweredApi.list({ type: 'TIMEOUT', from: week, size: 1 }),
-      ])
-      return f.totalElements + t.totalElements
-    },
+  // 카드 숫자 (답 못 한 질문·실패한 답변은 최근 7일)
+  const summary = useQuery({
+    queryKey: ['admin', 'dash', 'summary', week],
+    queryFn: () => adminDashboardApi.summary({ from: week }),
   })
+  const daily = useQuery({ queryKey: ['admin', 'dash', 'daily'], queryFn: adminDashboardApi.daily })
 
+  const s = summary.data
   const stats = [
-    { label: '답 못 한 질문', value: unansweredWeek.data?.totalElements, note: 'FAQ 추가가 필요한 질문이에요 · 최근 7일', to: '/admin/quality?tab=unanswered' },
-    { label: '미처리 오류 신고', value: feedback.data?.totalElements, note: '아직 처리하지 않은 신고예요 · 전체 기간', to: '/admin/quality' },
-    { label: '실패한 답변', value: failed.data, note: '생성 실패·시간 초과 · 최근 7일', to: '/admin/quality?tab=unanswered&types=FAILED,TIMEOUT' },
+    { label: '답 못 한 질문', value: s?.unansweredCount, note: 'FAQ 추가가 필요한 질문이에요 · 최근 7일', to: '/admin/quality?tab=unanswered' },
+    { label: '미처리 오류 신고', value: s?.unhandledFeedbackCount, note: '아직 처리하지 않은 신고예요 · 전체 기간', to: '/admin/quality' },
+    { label: '실패한 답변', value: s?.failedAnswerCount, note: '생성 실패·시간 초과 · 최근 7일', to: '/admin/quality?tab=unanswered&types=FAILED,TIMEOUT' },
   ]
+  const diff = s ? s.todayQuestionCount - s.yesterdayQuestionCount : null
+
+  // 새로고침: 대시보드에 있는 숫자·목록·그래프를 한 번에 다시 받는다
+  const queryClient = useQueryClient()
+  const refreshing = useIsFetching({ queryKey: ['admin', 'dash'] }) > 0
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'dash'] })
+  const updatedAt = summary.dataUpdatedAt
+    ? new Date(summary.dataUpdatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    : null
 
   return (
     <>
-      <PageHeader title="대시보드" desc="오늘 확인할 것부터 보여드려요." />
+      <PageHeader
+        title="대시보드"
+        desc="오늘 확인할 것부터 보여드려요."
+        actions={
+          <div className="flex items-center gap-3">
+            {updatedAt && <span className="text-[13px] text-ink-muted">{updatedAt} 기준</span>}
+            <button type="button" onClick={refresh} disabled={refreshing} className={`${secondaryBtn} h-10 px-3.5 text-sm`}>
+              <RotateCw size={16} aria-hidden className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? '불러오는 중…' : '새로고침'}
+            </button>
+          </div>
+        }
+      />
       <div className="grid grid-cols-4 gap-3">
         {stats.map((s) => (
           <Link key={s.label} to={s.to} className="flex flex-col gap-1 rounded-card border-[1.5px] border-line bg-surface px-4 py-3.5 hover:border-brand">
@@ -70,10 +83,15 @@ export default function AdminDashboardPage() {
             <span className="text-xs text-ink-muted">{s.note}</span>
           </Link>
         ))}
-        <div className="flex flex-col gap-1 rounded-card border-[1.5px] border-dashed border-line bg-surface px-4 py-3.5">
+        <div className="flex flex-col gap-1 rounded-card border-[1.5px] border-line bg-surface px-4 py-3.5">
           <span className="text-[13px] font-bold text-ink-sub">오늘 질문 수</span>
-          <span className="text-[26px] font-extrabold leading-8 text-ink-muted">–</span>
-          <span className="text-xs text-ink-muted">통계 API가 생기면 보여드려요</span>
+          <span className="text-[26px] font-extrabold leading-8 tracking-[-0.6px]">
+            {s?.todayQuestionCount ?? '–'}
+            <span className="ml-1 text-base font-bold text-ink-sub">건</span>
+          </span>
+          <span className="text-xs text-ink-muted">
+            {diff == null ? '어제와 비교해요' : diff === 0 ? '어제와 같아요' : `어제보다 ${Math.abs(diff)}건 ${diff > 0 ? '많아요' : '적어요'}`}
+          </span>
         </div>
       </div>
 
@@ -108,9 +126,11 @@ export default function AdminDashboardPage() {
               return (
                 <li key={m.messageId} className="flex items-center gap-3 border-t border-line px-5 py-2.5 text-sm">
                   <Badge tone={tone as 'brand'}>{label}</Badge>
-                  <span className="min-w-0 flex-1 truncate">{m.questionPreview}</span>
+                  <span className="min-w-0 flex-1 truncate" title={m.originQuestionPreview ? `되묻기에 답함: ${m.questionPreview}` : undefined}>
+                    {mainQuestion(m)}
+                  </span>
                   <Link
-                    to={`/admin/faqs/new?question=${encodeURIComponent(m.questionPreview)}`}
+                    to={`/admin/faqs/new?question=${encodeURIComponent(mainQuestion(m))}`}
                     className="shrink-0 rounded-[10px] border-[1.5px] border-line px-2.5 py-1 text-xs font-bold text-ink"
                   >
                     FAQ 추가
@@ -127,24 +147,64 @@ export default function AdminDashboardPage() {
         <div className="flex items-center justify-between px-5 py-3">
           <h2 className="flex items-center gap-2 text-[17px] font-extrabold">
             운영 상태
-            <span className="rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] font-bold text-ink-muted">구현 예정</span>
           </h2>
           <Link to="/admin/system" className="text-[13px] font-bold text-brand-strong underline underline-offset-2">자세히 보기</Link>
         </div>
         <div className="grid grid-cols-2 gap-4 border-t border-line px-5 py-4">
-          {['하루 질문 수 · 최근 7일', '오류 · 최근 7일'].map((title) => (
-            <div key={title} className="flex flex-col gap-2">
-              <span className="text-[13px] font-bold text-ink-sub">{title}</span>
-              <div aria-hidden className="flex h-[120px] items-end gap-2 rounded-xl border-[1.5px] border-dashed border-line px-3 pb-3">
-                {[40, 65, 50, 80, 55, 70, 45].map((h, i) => (
-                  <span key={i} className="flex-1 rounded-t-md bg-surface-2" style={{ height: `${h}%` }} />
-                ))}
-              </div>
-              <span className="text-xs text-ink-muted">통계 API가 연결되면 그래프로 보여드려요</span>
-            </div>
-          ))}
+          <DailyBars title="하루 질문 수 · 최근 7일" days={daily.data?.days} pick={(d) => d.questionCount} barClass="bg-brand" failed={daily.isError} />
+          <DailyBars title="오류 · 최근 7일" days={daily.data?.days} pick={(d) => d.errorCount} barClass="bg-danger" failed={daily.isError} />
         </div>
       </Card>
     </>
+  )
+}
+
+/** 최근 7일 막대그래프. 막대 위에 숫자, 아래에 날짜. 오늘은 진하게 */
+function DailyBars({
+  title,
+  days,
+  pick,
+  barClass,
+  failed,
+}: {
+  title: string
+  days: DashboardDay[] | undefined
+  pick: (d: DashboardDay) => number
+  barClass: string
+  failed: boolean
+}) {
+  const max = Math.max(1, ...(days ?? []).map(pick))
+  const total = (days ?? []).reduce((n, d) => n + pick(d), 0)
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="flex items-baseline justify-between text-[13px] font-bold text-ink-sub">
+        {title}
+        {days && <span className="text-xs font-semibold text-ink-muted">합계 {total.toLocaleString()}건</span>}
+      </span>
+      {!days ? (
+        <div className="flex h-[132px] items-center justify-center rounded-xl border-[1.5px] border-dashed border-line text-xs text-ink-muted">
+          {failed ? '불러오지 못했어요' : '불러오는 중…'}
+        </div>
+      ) : (
+        <div role="img" aria-label={`${title}: ${days.map((d) => `${d.date.slice(5)} ${pick(d)}건`).join(', ')}`} className="flex h-[132px] items-end gap-2">
+          {days.map((d, i) => {
+            const v = pick(d)
+            const today = i === days.length - 1
+            return (
+              <div key={d.date} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                <span className={`text-[11px] font-bold ${today ? 'text-ink' : 'text-ink-muted'}`}>{v}</span>
+                <span
+                  className={`w-full max-w-[36px] rounded-t-md ${v ? barClass : 'bg-surface-2'} ${today ? '' : 'opacity-55'}`}
+                  style={{ height: `${Math.max(4, (v / max) * 84)}px` }}
+                />
+                <span className={`text-[11px] ${today ? 'font-bold text-ink' : 'text-ink-muted'}`}>
+                  {today ? '오늘' : `${Number(d.date.slice(5, 7))}/${Number(d.date.slice(8, 10))}`}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
