@@ -163,23 +163,9 @@ export interface UnansweredDetail {
 type UnansweredPage = { messages: UnansweredListItem[] } & Page
 
 export const adminUnansweredApi = {
-  list: (q: PeriodQuery & { type?: UnansweredType }) =>
-    api<UnansweredPage>('/api/v1/admin/unanswered', { query: { ...q } }),
-  /**
-   * 유형 여러 개로 조회 (비우면 전체).
-   * 임시: 백엔드가 아직 유형을 하나만 받아서, 여러 개면 유형별로 불러 최신순으로 합친다
-   * (한 페이지에 유형 수만큼 행이 나올 수 있음). 백엔드가 여러 유형을 받게 되면 이 함수만 한 번 호출로 바꾼다.
-   */
-  listByTypes: async ({ types, ...q }: PeriodQuery & { types: UnansweredType[] }): Promise<UnansweredPage> => {
-    if (types.length <= 1) return adminUnansweredApi.list({ ...q, type: types[0] })
-    const pages = await Promise.all(types.map((type) => adminUnansweredApi.list({ ...q, type })))
-    return {
-      ...pages[0],
-      messages: pages.flatMap((p) => p.messages).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      totalElements: pages.reduce((n, p) => n + p.totalElements, 0),
-      totalPages: Math.max(...pages.map((p) => p.totalPages)),
-    }
-  },
+  /** 유형은 여러 개 줄 수 있다 (type=FAILED&type=TIMEOUT). 비우면 전체 */
+  list: ({ types, ...q }: PeriodQuery & { types?: UnansweredType[] }) =>
+    api<UnansweredPage>('/api/v1/admin/unanswered', { query: { ...q, type: types?.length ? types : undefined } }),
   get: (messageId: number) => api<UnansweredDetail>(`/api/v1/admin/unanswered/${messageId}`),
 }
 

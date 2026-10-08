@@ -31,7 +31,7 @@ export default function UnansweredPanel() {
   const [openId, setOpenId] = useState<number | null>(null)
 
   const query = { types, from: periodFrom(period), page, size: 20 }
-  const list = useQuery({ queryKey: ['admin', 'unanswered', query], queryFn: () => adminUnansweredApi.listByTypes(query) })
+  const list = useQuery({ queryKey: ['admin', 'unanswered', query], queryFn: () => adminUnansweredApi.list(query) })
 
   /** 유형 칩: 전체를 누르면 모두 해제, 나머지는 켜고 끈다. 다 켜지면 전체로 본다 */
   const pickTypes = (next: UnansweredType[]) => {

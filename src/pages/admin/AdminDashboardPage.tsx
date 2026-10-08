@@ -41,13 +41,7 @@ export default function AdminDashboardPage() {
   })
   const failed = useQuery({
     queryKey: ['admin', 'dash', 'failed', week],
-    queryFn: async () => {
-      const [f, t] = await Promise.all([
-        adminUnansweredApi.list({ type: 'FAILED', from: week, size: 1 }),
-        adminUnansweredApi.list({ type: 'TIMEOUT', from: week, size: 1 }),
-      ])
-      return f.totalElements + t.totalElements
-    },
+    queryFn: async () => (await adminUnansweredApi.list({ types: ['FAILED', 'TIMEOUT'], from: week, size: 1 })).totalElements,
   })
 
   const stats = [
