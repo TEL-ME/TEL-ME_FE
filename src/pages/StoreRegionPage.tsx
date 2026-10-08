@@ -1,6 +1,7 @@
 import { ChevronLeft, Search } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { handOffQuestion, placeStoreQuestion, regionStoreQuestion } from '../features/chat/askHandoff'
 import { goBack } from '../features/stores/goBack'
 import { hasKakaoKey } from '../features/stores/kakao/loadKakao'
 import { searchPlace } from '../features/stores/kakao/searchPlace'
@@ -21,9 +22,27 @@ const choice = (on: boolean) =>
     on ? 'border-brand bg-brand-soft font-bold text-brand-strong' : 'border-surface bg-surface font-medium text-ink'
   }`
 
-/** 지역으로 매장 찾기: 이름으로 검색하거나 시·도 → 시·군·구를 고른다 */
+/** 이 화면을 어디서 열었는지 (navigate의 state) */
+interface RegionEntry {
+  /** 상담에서 열었다: 고른 지역을 이 대화(주소)에 질문으로 보낸다 */
+  askChat?: string
+  /**
+   * 지역을 되묻는 말에 답하는 중이다: 지역 이름만 보낸다.
+   * 문장("… 찾아줘")으로 보내면 서버가 새 질문으로 보고, 앞서 말한 조건(유심 재발급 등)을 잇지 못한다.
+   */
+  asAnswer?: boolean
+  /** 매장 화면에서 열었다: 고른 뒤 뒤로 돌아가면 된다 */
+  fromStores?: boolean
+}
+
+/**
+ * 지역으로 매장 찾기: 이름으로 검색하거나 시·도 → 시·군·구를 고른다.
+ * 매장 화면에서 열면 고른 지역의 매장을 지도에 보여 주고, 상담에서 열면 그 지역 매장을 상담에 다시 묻는다.
+ */
 export default function StoreRegionPage() {
   const navigate = useNavigate()
+  const entry = (useLocation().state as RegionEntry | null) ?? {}
+  const chatPath = entry.askChat ?? null
   const origin = useStoreSearch((s) => s.origin)
   // 지금 지역으로 보고 있었다면 그 시·도를 펼쳐 둔다
   const [sido, setSido] = useState<Sido | null>(() =>
@@ -35,7 +54,15 @@ export default function StoreRegionPage() {
   const [notFound, setNotFound] = useState(false)
   const districts = useDistricts(sido?.code ?? null)
 
-  const back = () => goBack(navigate, '/stores')
+  const back = () => goBack(navigate, chatPath ?? '/stores')
+  /** 고른 지역을 매장 화면에 보여 주러 간다. 매장 화면에서 온 게 아니면(주소로 바로 들어옴 등) 매장 화면을 새로 연다 */
+  const showOnStores = () => (entry.fromStores ? back() : navigate('/stores', { replace: true }))
+  /** 상담으로 돌아가 질문을 보낸다 */
+  const askInChat = (question: string) => {
+    if (!chatPath) return
+    handOffQuestion(chatPath, question)
+    back()
+  }
 
   const keyword = query.trim()
   // 입력한 글자로 시·도와 (고른 시·도의) 시·군·구를 바로 추린다
@@ -61,8 +88,9 @@ export default function StoreRegionPage() {
     : []
 
   function apply(code: string, label: string) {
+    if (chatPath) return askInChat(entry.asAnswer ? label : regionStoreQuestion(label))
     setOrigin({ kind: 'region', code, label })
-    back()
+    showOnStores()
   }
 
   const onSubmit = async (e: FormEvent) => {
@@ -80,9 +108,10 @@ export default function StoreRegionPage() {
       const hit = await searchPlace(keyword)
       if (!hit) setNotFound(true)
       else if (hit.kind === 'region') apply(hit.code, hit.label)
+      else if (chatPath) askInChat(entry.asAnswer ? hit.label : placeStoreQuestion(hit.label))
       else {
         setOrigin({ kind: 'area', center: hit.center, radiusMeters: PLACE_RADIUS, label: hit.label })
-        back()
+        showOnStores()
       }
     } catch {
       setNotFound(true)
@@ -92,12 +121,14 @@ export default function StoreRegionPage() {
   }
 
   const picked = pick === WHOLE ? null : districts.data?.districts.find((d) => d.code === pick)
+  // 상담에서 열었으면 지도에 보여 주는 대신 상담에 묻는다
+  const verb = chatPath ? (entry.asAnswer ? '찾기' : '물어보기') : '보기'
   const applyLabel = !sido
     ? '시·도를 골라 주세요'
     : pick === WHOLE
-      ? `${sido.label} 전체 매장 보기`
+      ? `${sido.label} 전체 매장 ${verb}`
       : picked
-        ? `${regionLabel(sido, picked.name)} 매장 보기`
+        ? `${regionLabel(sido, picked.name)} 매장 ${verb}`
         : '시·군·구를 골라 주세요'
   const canApply = sido != null && (pick === WHOLE || picked != null)
 
@@ -132,7 +163,14 @@ export default function StoreRegionPage() {
       </header>
 
       <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 pt-2">
-        <h1 className="px-1 text-[22px] font-extrabold leading-[30px] tracking-[-0.4px]">지역으로 매장 찾기</h1>
+        <div className="flex flex-col gap-1 px-1">
+          <h1 className="text-[22px] font-extrabold leading-[30px] tracking-[-0.4px]">지역으로 매장 찾기</h1>
+          {chatPath && (
+            <p className="text-[13px] leading-5 text-ink-sub">
+              {entry.asAnswer ? '지역을 고르면 무러바라에게 답으로 보내요.' : '지역을 고르면 무러바라에게 그 지역 매장을 물어봐요.'}
+            </p>
+          )}
+        </div>
 
         {(hits.length > 0 || notFound) && (
           <div className="rounded-card bg-surface px-3 py-1">

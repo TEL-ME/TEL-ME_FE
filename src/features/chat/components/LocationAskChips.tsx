@@ -1,6 +1,6 @@
 import { LocateFixed, MapIcon } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import type { ChatCoordinates } from '../../../api/chat'
 import { locateErrorMessage, locateMe } from '../../stores/locate'
 import { rememberMe } from '../../stores/storeSearchStore'
@@ -17,10 +17,11 @@ const chip =
 
 /**
  * 어느 지역 매장을 찾는지 되물었을 때, 말풍선 아래에 두는 빠른 답.
- * 지역 이름은 입력창에 직접 써도 된다.
+ * 지역 이름은 입력창에 직접 쓰거나 "지역 고르기"에서 골라도 된다.
  */
 export default function LocationAskChips({ disabled, onAsk }: LocationAskChipsProps) {
   const [locating, setLocating] = useState(false)
+  const { pathname } = useLocation()
 
   // 누르는 것 자체가 동의라서 따로 묻지 않는다. 처음이면 브라우저가 위치 권한을 묻는다
   const answerWithLocation = async () => {
@@ -44,9 +45,10 @@ export default function LocationAskChips({ disabled, onAsk }: LocationAskChipsPr
           {locating ? '위치 확인 중…' : '현재 위치 사용'}
         </button>
       )}
-      <Link to="/stores" className={chip}>
+      {/* 지역을 고르면 그 이름을 이 대화에 답으로 보낸다 (askChat: 답을 보낼 대화 주소) */}
+      <Link to="/stores/region" state={{ askChat: pathname, asAnswer: true }} className={chip}>
         <MapIcon size={15} strokeWidth={2} aria-hidden />
-        지도에서 찾기
+        지역 고르기
       </Link>
       <button type="button" disabled={disabled || locating} onClick={() => onAsk(DECLINE_ANSWER)} className={chip}>
         {DECLINE_ANSWER}
