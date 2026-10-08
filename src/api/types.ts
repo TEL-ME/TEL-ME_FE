@@ -9,7 +9,8 @@ export interface CustomResponse<T> {
 // ---- 채팅 (TEL-ME_BE develop 기준) ----
 export type SessionStatus = 'ACTIVE' | 'NEED_CLARIFICATION' | 'CLOSED'
 export type MessageRole = 'USER' | 'ASSISTANT'
-export type MessageType = 'QUESTION' | 'ANSWER' | 'CLARIFICATION' | 'STORE_RESULT' | 'ERROR'
+/** BLOCKED: 입력 검사(욕설·민감정보)에 걸려 답변을 만들지 않은 사용자 메시지 */
+export type MessageType = 'QUESTION' | 'ANSWER' | 'CLARIFICATION' | 'STORE_RESULT' | 'ERROR' | 'BLOCKED'
 export type MessageStatus = 'GENERATING' | 'COMPLETED' | 'FAILED' | 'TIMEOUT' | 'CANCELLED'
 export type AnswerBasis = 'GROUNDED' | 'NO_EVIDENCE' | 'OUT_OF_SCOPE'
 export type ExecutionStatus = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
@@ -89,13 +90,33 @@ export interface ChatMessageHistory {
   runningExecutionId: number | null
 }
 
+/**
+ * 입력 검사 결과 (TELME-119)
+ * - MASKED: 민감정보를 가리고 정상 접수 (실행 ID 있음)
+ * - WARNED: 욕설 경고 · REWRITE_REQUIRED: 민감정보 빼고 다시 입력 · RESTRICTED: 일시 제한 (셋 다 실행 ID 없음)
+ */
+export type InputGuardAction = 'MASKED' | 'WARNED' | 'REWRITE_REQUIRED' | 'RESTRICTED'
+
+export interface InputGuardNotice {
+  action: InputGuardAction
+  message: string
+  violationCount: number
+  retryAfterSeconds: number
+  restrictionStartedAt: string | null
+  restrictionUntil: string | null
+  detections: { reason: string; ruleId: string }[]
+}
+
 export interface ChatMessageSendResponse {
   sessionId: number
-  messageId: number
-  sequenceNo: number
-  executionId: number
-  executionStatus: ExecutionStatus
+  /** 이미 제한 중이면 메시지를 저장하지 않아 없다 */
+  messageId?: number | null
+  sequenceNo?: number | null
+  /** 없으면 답변을 만들지 않은 것 (경고·재입력 안내·일시 제한). SSE를 구독하지 않는다 */
+  executionId?: number | null
+  executionStatus?: ExecutionStatus | null
   createdAt: string
+  inputGuard?: InputGuardNotice | null
 }
 
 export interface ChatSource {

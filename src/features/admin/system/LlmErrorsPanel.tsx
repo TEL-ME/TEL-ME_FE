@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { adminSystemApi, LLM_TASKS, taskLabel, type LlmErrorType, type LlmTaskType } from '../../../api/admin'
+import { adminSystemApi, taskLabel, VISIBLE_TASKS, type LlmErrorType, type LlmTaskType } from '../../../api/admin'
 import { formatAdminTime } from '../../../lib/date'
 import { Badge, Card, Chip, Empty, FilterSelect, Pager, TableHead } from '../components/AdminUi'
 import { PERIODS, periodFrom, type Period } from '../periods'
@@ -12,7 +12,7 @@ const ERROR_TYPES: [LlmErrorType, string][] = [
   ['MODEL_ERROR', '모델 오류'],
 ]
 const errorLabel = (t: string) => ERROR_TYPES.find(([k]) => k === t)?.[1] ?? t
-const TASK_OPTIONS = [['ALL', '전체'], ...LLM_TASKS] as [LlmTaskType | 'ALL', string][]
+const TASK_OPTIONS = [['ALL', '전체'], ...VISIBLE_TASKS] as [LlmTaskType | 'ALL', string][]
 
 const COLS = '120px 96px 92px 56px 76px minmax(0,1fr) 72px'
 

@@ -12,10 +12,22 @@ export const NEARBY_QUESTION = '현재 위치에서 가까운 매장을 찾아�
 /** 지역을 알려 주지 않겠다는 답 */
 export const DECLINE_ANSWER = '알려주고 싶지 않아요'
 
+type AskMessage = Pick<ChatMessage, 'messageType' | 'content'> & Partial<Pick<ChatMessage, 'followUps'>>
+
+/** 선택지를 함께 주는 되묻기인지 (예: 업무 되묻기 → followUps에 "유심 재발급", "번호이동"…). 버튼 글자를 그대로 보낸다 */
+export function hasChoices(message: AskMessage | undefined): boolean {
+  return message?.messageType === 'CLARIFICATION' && !!message.followUps?.some((s) => s.trim())
+}
+
 /**
  * 매장을 찾을 지역을 되묻는 말인지.
  * 되묻는 내용 종류를 서버가 따로 주지 않아(문장도 모델이 만든다) 문장에 든 낱말로 고른다.
+ * 선택지(followUps)가 있으면 지역 되묻기가 아니다 — 지역 되묻기는 선택지가 비어 있다 (TELME-129)
  */
-export function isLocationAsk(message: Pick<ChatMessage, 'messageType' | 'content'> | undefined): boolean {
-  return message?.messageType === 'CLARIFICATION' && /매장|지역|위치|근처|동네|어디/.test(message.content ?? '')
+export function isLocationAsk(message: AskMessage | undefined): boolean {
+  return (
+    message?.messageType === 'CLARIFICATION' &&
+    !hasChoices(message) &&
+    /매장|지역|위치|근처|동네|어디/.test(message.content ?? '')
+  )
 }

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { chatApi, subscribeExecution, type ChatCoordinates } from '../../api/chat'
 import { ApiError } from '../../api/client'
 import { queryClient } from '../../lib/queryClient'
+import { showToast } from '../../stores/toastStore'
+import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
 
@@ -136,6 +138,7 @@ export async function sendQuestion(
   if (!content || isBusy(get().status)) return
   lastLocated = coords ? { content, coords } : null
 
+  clearInputGuardNotice()
   set({ status: 'sending', pendingQuestion: content, typingMessageId: null, errorMessage: null })
   let sessionId = get().sessionId
   try {
@@ -147,8 +150,17 @@ export async function sendQuestion(
     }
     const sent = await chatApi.sendMessage(sessionId, content, coords)
     if (get().sessionId !== sessionId) return
+    // 입력 검사 (TELME-119): 가림(MASKED)은 그대로 진행, 경고·재입력·제한은 답변을 만들지 않는다
+    if (sent.inputGuard) {
+      applyInputGuard(sent.inputGuard)
+      if (sent.inputGuard.action === 'MASKED') showToast(sent.inputGuard.message)
+    }
     await refreshMessages(sessionId)
     set({ pendingQuestion: null })
+    if (sent.executionId == null) {
+      set({ status: 'idle' })
+      return
+    }
     listen(sessionId, sent.executionId)
   } catch (error) {
     if (get().sessionId !== sessionId) return
@@ -199,6 +211,7 @@ export async function retryAnswer(
     const sent = await chatApi.retryMessage(sessionId, failedMessageId)
     if (get().sessionId !== sessionId) return
     await refreshMessages(sessionId)
+    if (sent.executionId == null) return set({ status: 'idle' })
     listen(sessionId, sent.executionId)
   } catch (error) {
     if (get().sessionId !== sessionId) return

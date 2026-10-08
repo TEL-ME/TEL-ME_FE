@@ -99,7 +99,13 @@ export default function MessageList({
       </div>
 
       {sorted.map((m, i) => {
-        if (m.role === 'USER') return <UserBubble key={m.messageId}>{m.content}</UserBubble>
+        if (m.role === 'USER') {
+          return (
+            <UserBubble key={m.messageId} blocked={m.messageType === 'BLOCKED'}>
+              {m.content}
+            </UserBubble>
+          )
+        }
 
         if (m.status === 'GENERATING') {
           return (
@@ -150,11 +156,12 @@ export default function MessageList({
               ) : undefined
             }
             after={
-              !showExtras || m.messageId !== lastAnswerId ? undefined : isLocationAsk(m) && !closed ? (
-                // 어느 지역인지 되물었을 때: 현재 위치로 답하거나 지도에서 직접 찾는다
+              !showExtras || m.messageId !== lastAnswerId ? undefined : m.followUps?.some((s) => s.trim()) ? (
+                // 선택지·추천 질문이 있으면 먼저 그린다 (업무 되묻기는 followUps가 선택지 — 버튼 글자를 그대로 보낸다)
+                <FollowUps items={m.followUps} disabled={busy || closed} onAsk={onAsk} choices={m.messageType === 'CLARIFICATION'} />
+              ) : isLocationAsk(m) && !closed ? (
+                // 어느 지역인지 되물었을 때(선택지 없음): 현재 위치로 답하거나 지도에서 직접 찾는다
                 <LocationAskChips disabled={busy} onAsk={onAsk} />
-              ) : m.followUps?.length ? (
-                <FollowUps items={m.followUps} disabled={busy} onAsk={onAsk} />
               ) : undefined
             }
           >

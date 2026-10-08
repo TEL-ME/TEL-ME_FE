@@ -1,7 +1,18 @@
 import type { ReactNode } from 'react'
 import avatarImg from '../../../assets/home/mudo-headset.png'
 
-export function UserBubble({ children }: { children: ReactNode }) {
+export function UserBubble({ children, blocked = false }: { children: ReactNode; blocked?: boolean }) {
+  if (blocked) {
+    // 입력 검사에 걸려 답변을 만들지 않은 질문 (가려진 내용으로 저장된다)
+    return (
+      <div className="tm-rise flex flex-col items-end gap-1">
+        <div className="max-w-[82%] whitespace-pre-line rounded-[22px] rounded-br-md border-[1.5px] border-dashed border-line bg-surface-2 px-4 py-3 text-[15px] leading-6 text-ink-sub">
+          {children}
+        </div>
+        <span className="mr-1 text-xs text-ink-muted">운영 정책에 따라 답변하지 않은 메시지예요</span>
+      </div>
+    )
+  }
   return (
     <div className="tm-rise flex justify-end">
       <div className="max-w-[82%] whitespace-pre-line rounded-[22px] rounded-br-md bg-brand px-4 py-3 text-[15px] leading-6 text-white">

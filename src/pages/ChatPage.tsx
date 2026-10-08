@@ -18,6 +18,8 @@ import {
 } from '../features/chat/chatRunStore'
 import ChatHeader from '../features/chat/components/ChatHeader'
 import Composer from '../features/chat/components/Composer'
+import InputGuardBanner from '../features/chat/components/InputGuardBanner'
+import { useRestrictionText } from '../features/chat/useRestrictionText'
 import HomeIntro from '../features/chat/components/HomeIntro'
 import MessageList from '../features/chat/components/MessageList'
 import SessionDrawer from '../features/chat/components/SessionDrawer'
@@ -34,7 +36,7 @@ import { sessionsKey, useSessions } from '../features/chat/sessionQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '../stores/toastStore'
 import { useChatScroll } from '../features/chat/useChatScroll'
-import { isLocationAsk } from '../features/chat/storeAsk'
+import { hasChoices, isLocationAsk } from '../features/chat/storeAsk'
 import { takeHandedQuestion } from '../features/chat/askHandoff'
 
 const MUDO_BY_STATUS: Record<ChatStatus, MudoStatus> = {
@@ -168,11 +170,13 @@ export default function ChatPage() {
     invalidRoute || (messagesQuery.error instanceof ApiError && [400, 403, 404].includes(messagesQuery.error.status))
   const showThread = activeId != null && !notFound
   const lastAssistant = messages.filter((m) => m.role === 'ASSISTANT').at(-1)
-  // 되묻기 답변일 때 입력창 안내. 되묻는 내용 종류를 서버가 따로 주지 않아 질문 문장으로 고른다
+  // 되묻기 답변일 때 입력창 안내. 선택지가 있으면 고르게 하고, 없으면 질문 문장으로 고른다
   const placeholder =
     lastAssistant?.messageType !== 'CLARIFICATION'
       ? undefined
-      : isLocationAsk(lastAssistant)
+      : hasChoices(lastAssistant)
+        ? '위에서 고르거나 직접 입력해 주세요'
+        : isLocationAsk(lastAssistant)
         ? '예: 강남역 근처, 마포구'
         : '무러바라가 물어본 내용을 알려 주세요'
 
@@ -194,6 +198,9 @@ export default function ChatPage() {
       setConfirmEnd(false)
     }
   }
+
+  // 반복 욕설로 일시 제한 중이면 입력을 막는다 (TELME-119)
+  const restriction = useRestrictionText()
 
   const listProps = { currentId: activeId, busy, onPick: pickSession, onNewChat: newChat }
 
@@ -279,7 +286,12 @@ export default function ChatPage() {
               </button>
             </div>
           ) : (
-            !notFound && <Composer busy={busy} placeholder={placeholder} onSend={ask} />
+            !notFound && (
+              <>
+                <InputGuardBanner />
+                <Composer busy={busy} placeholder={placeholder} lockedText={restriction} onSend={ask} />
+              </>
+            )
           )}
         </footer>
       </div>
