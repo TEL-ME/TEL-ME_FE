@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Fragment, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { adminUnansweredApi, type UnansweredType } from '../../api/admin'
+import { adminUnansweredApi, mainQuestion, type UnansweredType } from '../../api/admin'
 import { formatAdminTime } from '../../lib/date'
 import { Badge, Card, Chip, Empty, FilterSelect, Pager, TableHead } from './components/AdminUi'
 import { PERIODS, periodFrom, type Period } from './periods'
@@ -92,12 +92,15 @@ export default function UnansweredPanel() {
                 type="button"
                 aria-expanded={openId === m.messageId}
                 onClick={() => setOpenId(openId === m.messageId ? null : m.messageId)}
-                className="truncate text-left hover:underline"
+                className="flex min-w-0 flex-col text-left hover:underline"
               >
-                {m.questionPreview}
+                <span className="truncate">{mainQuestion(m)}</span>
+                {m.originQuestionPreview && (
+                  <span className="truncate text-xs text-ink-muted">되묻기에 답함: {m.questionPreview}</span>
+                )}
               </button>
               <Link
-                to={`/admin/faqs/new?question=${encodeURIComponent(m.questionPreview)}`}
+                to={`/admin/faqs/new?question=${encodeURIComponent(mainQuestion(m))}`}
                 className="justify-self-end whitespace-nowrap rounded-[10px] border-[1.5px] border-line px-3 py-1.5 text-[13px] font-bold text-ink"
               >
                 FAQ 추가
@@ -128,9 +131,15 @@ function UnansweredDetailRow({ id }: { id: number }) {
     <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-6 border-t border-line bg-surface-2 px-5 py-5 text-sm">
       <div className="flex flex-col gap-4">
         <section>
-          <h3 className="mb-1.5 text-xs font-bold text-ink-muted">질문 전체</h3>
-          <p className="whitespace-pre-line rounded-xl bg-surface px-4 py-3">{d.question}</p>
+          <h3 className="mb-1.5 text-xs font-bold text-ink-muted">{d.originQuestion ? '처음 질문' : '질문 전체'}</h3>
+          <p className="whitespace-pre-line rounded-xl bg-surface px-4 py-3">{d.originQuestion || d.question}</p>
         </section>
+        {d.originQuestion && (
+          <section>
+            <h3 className="mb-1.5 text-xs font-bold text-ink-muted">되묻기에 답한 내용</h3>
+            <p className="whitespace-pre-line rounded-xl bg-surface px-4 py-3">{d.question}</p>
+          </section>
+        )}
         <section>
           <h3 className="mb-1.5 text-xs font-bold text-ink-muted">무러바라의 답변</h3>
           <p className="whitespace-pre-line rounded-xl bg-surface px-4 py-3 leading-6">{d.answer || '답변이 만들어지지 않았어요'}</p>
@@ -142,7 +151,7 @@ function UnansweredDetailRow({ id }: { id: number }) {
           <SourceRows sources={d.sources} />
         </section>
         <Link
-          to={`/admin/faqs/new?question=${encodeURIComponent(d.question)}`}
+          to={`/admin/faqs/new?question=${encodeURIComponent(d.originQuestion || d.question)}`}
           className="inline-flex h-11 items-center justify-center rounded-[14px] bg-brand text-[15px] font-bold text-white"
         >
           이 질문으로 FAQ 추가

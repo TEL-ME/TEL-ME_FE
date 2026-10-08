@@ -146,15 +146,25 @@ export interface UnansweredListItem {
   messageId: number
   sessionId: number
   type: UnansweredType
+  /** 이 답변을 요청한 사용자 메시지. 되묻기 뒤에는 조건 답변(예: 마포구)이 들어 있다 */
   questionPreview: string
+  /** 되묻기가 있었으면 상담을 시작한 원래 질문. 없으면 null */
+  originQuestionPreview: string | null
   createdAt: string
 }
+
+/** 화면에 보여 줄 질문: 원래 질문이 있으면 그것, 없으면 요청 메시지 */
+export const mainQuestion = (m: { questionPreview: string; originQuestionPreview: string | null }) =>
+  m.originQuestionPreview || m.questionPreview
 
 export interface UnansweredDetail {
   messageId: number
   sessionId: number
   type: UnansweredType
+  /** 되묻기 뒤에는 조건 답변이 들어 있다 */
   question: string
+  /** 되묻기가 있었으면 상담을 시작한 원래 질문. 없으면 null */
+  originQuestion: string | null
   answer: string | null
   createdAt: string
   sources: AdminSource[]
@@ -167,6 +177,96 @@ export const adminUnansweredApi = {
   list: ({ types, ...q }: PeriodQuery & { types?: UnansweredType[] }) =>
     api<UnansweredPage>('/api/v1/admin/unanswered', { query: { ...q, type: types?.length ? types : undefined } }),
   get: (messageId: number) => api<UnansweredDetail>(`/api/v1/admin/unanswered/${messageId}`),
+}
+
+// ---- 대시보드 ----
+/** GET /admin/dashboard. from·to는 답 못 한 질문 수·실패한 답변 수에만 걸린다 */
+export interface DashboardSummary {
+  unansweredCount: number
+  /** 기간과 상관없이 전체 */
+  unhandledFeedbackCount: number
+  failedAnswerCount: number
+  /** 한국 시간 자정 기준 */
+  todayQuestionCount: number
+  yesterdayQuestionCount: number
+}
+
+/** GET /admin/dashboard/daily — 오늘 포함 최근 7일, 오래된 날부터. 기록 없는 날도 0 */
+export interface DashboardDay {
+  /** YYYY-MM-DD */
+  date: string
+  questionCount: number
+  errorCount: number
+}
+
+export const adminDashboardApi = {
+  summary: (q: { from?: string; to?: string } = {}) => api<DashboardSummary>('/api/v1/admin/dashboard', { query: { ...q } }),
+  daily: () => api<{ days: DashboardDay[] }>('/api/v1/admin/dashboard/daily'),
+}
+
+// ---- 운영 상태 ----
+/** LLM 작업 종류 (백엔드 LlmGeneration.TaskType) */
+export type LlmTaskType =
+  | 'ROUTING'
+  | 'CONTEXT_RESOLUTION'
+  | 'RAG_ANSWER'
+  | 'CLARIFICATION'
+  | 'CONDITION_EXTRACT'
+  | 'FOLLOW_UP'
+  | 'SUMMARY'
+  | 'SESSION_TITLE'
+
+export const LLM_TASKS: [LlmTaskType, string][] = [
+  ['ROUTING', '의도 분류'],
+  ['CONTEXT_RESOLUTION', '문맥 연결'],
+  ['RAG_ANSWER', '답변 생성'],
+  ['CLARIFICATION', '되묻기'],
+  ['CONDITION_EXTRACT', '조건 추출'],
+  ['FOLLOW_UP', '추천 질문'],
+  ['SUMMARY', '대화 요약'],
+  ['SESSION_TITLE', '대화 제목'],
+]
+export const taskLabel = (t: string) => LLM_TASKS.find(([k]) => k === t)?.[1] ?? t
+
+export type LlmErrorType = 'TIMEOUT' | 'CONNECTION_FAILED' | 'MODEL_ERROR'
+
+export interface LlmErrorItem {
+  generationId: number
+  createdAt: string
+  errorType: LlmErrorType
+  taskType: LlmTaskType
+  /** 몇 번째 시도였는지 (재시도한 호출은 시도마다 한 건) */
+  attempt: number
+  model: string | null
+  totalMs: number | null
+  errorMessage: string | null
+  executionId: number | null
+}
+
+/** 건수가 0이면 시간 값은 null */
+export interface LatencyStats {
+  count: number
+  avgMs: number | null
+  p50Ms: number | null
+  p95Ms: number | null
+}
+
+export interface Latency {
+  from: string
+  to: string
+  /** 질문을 받은 때부터 답변 저장까지 (완료된 실행만) */
+  overall: LatencyStats
+  /** 답변 생성 LLM의 첫 토큰까지 */
+  firstToken: LatencyStats
+  tasks: (LatencyStats & { taskType: LlmTaskType })[]
+}
+
+export const adminSystemApi = {
+  /** 비우면 errorType은 세 종류 전체, taskType은 모든 작업 */
+  errors: (q: PeriodQuery & { errorType?: LlmErrorType; taskType?: LlmTaskType }) =>
+    api<{ errors: LlmErrorItem[] } & Page>('/api/v1/admin/system/errors', { query: { ...q } }),
+  /** 기간을 비우면 최근 24시간 */
+  latency: (q: { from?: string; to?: string } = {}) => api<Latency>('/api/v1/admin/system/latency', { query: { ...q } }),
 }
 
 // ---- 매장 ----
