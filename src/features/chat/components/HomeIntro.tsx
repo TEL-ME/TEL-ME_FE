@@ -44,7 +44,7 @@ export default function HomeIntro({ disabled, onAsk }: HomeIntroProps) {
                 <button
                   type="button"
                   disabled={disabled}
-                  onClick={() => onAsk(chip.label)}
+                  onClick={() => onAsk('question' in chip ? chip.question : chip.label)}
                   className="flex min-h-12 w-full items-center gap-3 px-1 py-1.5 text-left text-ink disabled:opacity-60"
                 >
                   <span
