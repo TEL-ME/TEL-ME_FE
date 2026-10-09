@@ -5,11 +5,12 @@ import { PageHeader, secondaryBtn } from '../../features/admin/components/AdminU
 import IntentPanel from '../../features/admin/system/IntentPanel'
 import LatencyPanel from '../../features/admin/system/LatencyPanel'
 import LlmErrorsPanel from '../../features/admin/system/LlmErrorsPanel'
+import SearchScoresPanel from '../../features/admin/system/SearchScoresPanel'
 
 const TABS: { key: string; label: string; icon: LucideIcon; desc: string; api: string; ready?: boolean }[] = [
   { key: 'errors', label: '오류 목록', icon: OctagonAlert, desc: '답변을 만들다 실패한 작업과 오류 종류, 시도 횟수를 보여드려요.', api: 'GET /api/v1/admin/system/errors', ready: true },
   { key: 'latency', label: '응답 속도', icon: Gauge, desc: '첫 글자까지·답변이 끝날 때까지 걸린 시간을 작업별로 보여드려요.', api: 'GET /api/v1/admin/system/latency', ready: true },
-  { key: 'scores', label: '검색 점수', icon: Activity, desc: 'FAQ 검색 점수 분포와 임계값을 넘은 비율을 보여드려요.', api: 'GET /api/v1/admin/system/search-scores' },
+  { key: 'scores', label: '검색 점수', icon: Activity, desc: 'FAQ 검색 점수 분포와 임계값을 넘은 비율을 보여드려요.', api: 'GET /api/v1/admin/system/search-scores', ready: true },
   { key: 'intents', label: '의도 분포', icon: ListTree, desc: '질문 의도(FAQ·매장·복합·미분류) 비율과 규칙·LLM 분류 비율을 보여드려요.', api: 'GET /api/v1/admin/dashboard/intent-distribution', ready: true },
 ]
 
@@ -69,6 +70,7 @@ export default function AdminSystemPage() {
       </div>
       {tab.key === 'errors' && <LlmErrorsPanel />}
       {tab.key === 'latency' && <LatencyPanel />}
+      {tab.key === 'scores' && <SearchScoresPanel />}
       {tab.key === 'intents' && <IntentPanel />}
       {!tab.ready && (
       <section

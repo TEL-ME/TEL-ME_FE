@@ -290,12 +290,38 @@ export interface Latency {
   tasks: (LatencyStats & { taskType: LlmTaskType })[]
 }
 
+/** min 이상 max 미만 (마지막 칸만 1.0 포함) */
+export interface SearchScoreBucket {
+  min: number
+  max: number
+  count: number
+}
+
+/**
+ * 검색 점수 분포 (TELME-123). 상담에서 질문마다 처음 한 FAQ 검색 기준.
+ * - total: 질문 수 / scored: 질문+답변 벡터(Q_A) 1위 점수가 있는 질문 수(= buckets 합)
+ * - passed: 첫 검색으로 근거를 찾은 질문 / refinedPassed: 첫 검색은 비었지만 정제 질문으로 찾은 질문
+ * - aboveThreshold: 1위 점수가 검색 당시 임계값 이상인 질문 / buckets: 0~1을 0.05 간격 20칸
+ */
+export interface SearchScores {
+  threshold: number
+  total: number
+  scored: number
+  passed: number
+  refinedPassed: number
+  aboveThreshold: number
+  buckets: SearchScoreBucket[]
+}
+
 export const adminSystemApi = {
   /** 비우면 errorType은 세 종류 전체, taskType은 모든 작업 */
   errors: (q: PeriodQuery & { errorType?: LlmErrorType; taskType?: LlmTaskType }) =>
     api<{ errors: LlmErrorItem[] } & Page>('/api/v1/admin/system/errors', { query: { ...q } }),
   /** 기간을 비우면 최근 24시간 */
   latency: (q: { from?: string; to?: string } = {}) => api<Latency>('/api/v1/admin/system/latency', { query: { ...q } }),
+  /** 기간을 비우면 전체 (기록은 90일 보관) */
+  searchScores: (q: { from?: string; to?: string } = {}) =>
+    api<SearchScores>('/api/v1/admin/system/search-scores', { query: { ...q } }),
 }
 
 // ---- 매장 ----
