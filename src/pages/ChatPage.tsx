@@ -36,7 +36,9 @@ import { sessionsKey, useSessions } from '../features/chat/sessionQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '../stores/toastStore'
 import { useChatScroll } from '../features/chat/useChatScroll'
-import { hasChoices, isLocationAsk } from '../features/chat/storeAsk'
+import { CHAT_GPS_ENABLED, hasChoices, isLocationAsk, wantsNearbyStore } from '../features/chat/storeAsk'
+import { locateErrorMessage, locateMe } from '../features/stores/locate'
+import { rememberMe } from '../features/stores/storeSearchStore'
 import { takeHandedQuestion } from '../features/chat/askHandoff'
 
 const MUDO_BY_STATUS: Record<ChatStatus, MudoStatus> = {
@@ -119,6 +121,24 @@ export default function ChatPage() {
   const ask = (question: string, coords?: ChatCoordinates) => {
     toBottom()
     void sendQuestion(question, (id) => navigate(`/chat/${id}`), coords)
+  }
+
+  // 입력창에 "현재 위치·근처·주변 + 매장"을 쓰면 위치 권한을 받아 좌표를 함께 보낸다.
+  // 위치를 못 받으면 좌표 없이 보낸다 (서버가 지역을 되묻는다)
+  const [locating, setLocating] = useState(false)
+  const askTyped = async (question: string) => {
+    if (!CHAT_GPS_ENABLED || !wantsNearbyStore(question)) return ask(question)
+    setLocating(true)
+    try {
+      const here = await locateMe()
+      rememberMe(here)
+      ask(question, { latitude: here.lat, longitude: here.lng })
+    } catch (error) {
+      showToast(locateErrorMessage(error, '위치 권한이 꺼져 있어서 지역을 여쭤볼게요'))
+      ask(question)
+    } finally {
+      setLocating(false)
+    }
   }
 
   // 다른 화면에서 질문을 들고 온 경우 (예: 마이 → 무러바라에게 요금제 물어보기) 한 번만 보낸다
@@ -289,7 +309,12 @@ export default function ChatPage() {
             !notFound && (
               <>
                 <InputGuardBanner />
-                <Composer busy={busy} placeholder={placeholder} lockedText={restriction} onSend={ask} />
+                <Composer
+                  busy={busy || locating}
+                  placeholder={locating ? '현재 위치를 확인하고 있어요…' : placeholder}
+                  lockedText={restriction}
+                  onSend={(q) => void askTyped(q)}
+                />
               </>
             )
           )}

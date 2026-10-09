@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasChoices, isLocationAsk } from './storeAsk'
+import { hasChoices, isLocationAsk, wantsNearbyStore } from './storeAsk'
 
 describe('isLocationAsk', () => {
   it('매장을 찾을 지역을 되묻는 말을 알아본다', () => {
@@ -21,5 +21,30 @@ describe('isLocationAsk', () => {
     expect(isLocationAsk(ask)).toBe(false)
     expect(hasChoices(ask)).toBe(true)
     expect(hasChoices({ ...ask, followUps: [] })).toBe(false)
+  })
+})
+
+describe('wantsNearbyStore', () => {
+  it.each([
+    '현재 위치 근처 매장 알려줘',
+    '현재위치에서 가까운 매장',
+    '내 위치 기준 대리점 찾아줘',
+    '근처 매장 알려줘',
+    '주변에 유심 재발급 되는 매장 있어?',
+    '내 주변 매장',
+    '지금 근처 대리점 어디야',
+  ])('"%s" → 좌표를 붙인다', (text) => {
+    expect(wantsNearbyStore(text)).toBe(true)
+  })
+
+  it.each([
+    '강남역 근처 매장 알려줘',
+    '마포구 주변 대리점',
+    '강남역근처 매장',
+    '근처에서 데이터가 안 터져요',
+    '가까운 매장 알아보기',
+    '요금제 추천해줘',
+  ])('"%s" → 붙이지 않는다', (text) => {
+    expect(wantsNearbyStore(text)).toBe(false)
   })
 })

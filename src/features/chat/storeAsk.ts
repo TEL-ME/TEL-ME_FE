@@ -31,3 +31,21 @@ export function isLocationAsk(message: AskMessage | undefined): boolean {
     /매장|지역|위치|근처|동네|어디/.test(message.content ?? '')
   )
 }
+
+const STORE_WORD = /매장|대리점|지점|판매점|직영점/
+const HERE_WORD = /(현재|내|제|지금)\s*위치/
+/** "근처·주변" 앞에 와도 지역 이름이 아닌 말 */
+const NOT_PLACE = new Set(['내', '제', '우리', '저희', '지금', '현재', '여기', '이', '이쪽', '집'])
+
+/**
+ * 직접 쓴 질문이 "내 주변 매장"을 찾는 말인지. 맞으면 위치 권한을 받아 좌표를 함께 보낸다.
+ * - "현재 위치", "내 위치" + 매장
+ * - "근처", "주변" + 매장. 단 "강남역 근처 매장"처럼 앞에 지역 이름이 있으면 아니다
+ *   (서버가 좌표를 지역보다 먼저 쓰므로(TELME-127) 좌표를 붙이면 강남역이 아니라 지금 위치로 찾게 된다)
+ */
+export function wantsNearbyStore(text: string): boolean {
+  if (!STORE_WORD.test(text)) return false
+  if (HERE_WORD.test(text)) return true
+  const words = text.trim().split(/\s+/)
+  return words.some((w, i) => /^(근처|주변)/.test(w) && (i === 0 || NOT_PLACE.has(words[i - 1])))
+}
