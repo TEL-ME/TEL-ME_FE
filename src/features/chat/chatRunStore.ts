@@ -3,7 +3,9 @@ import { chatApi, subscribeExecution, type ChatCoordinates } from '../../api/cha
 import { ApiError } from '../../api/client'
 import { queryClient } from '../../lib/queryClient'
 import { showToast } from '../../stores/toastStore'
+import { coordsForNext, forgetCoords, rememberCoords } from './heldCoords'
 import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
+import type { ChatMessageHistory } from '../../api/types'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
 
@@ -67,6 +69,7 @@ export function attachSession(sessionId: number | null) {
   if (get().sessionId === sessionId) return
   closeStream()
   lastLocated = null
+  forgetCoords()
   set({ ...initial, sessionId })
 }
 
@@ -128,6 +131,7 @@ export function resumeExecution(sessionId: number, executionId: number) {
 /**
  * 질문 보내기. 메인(새 대화)에서는 이때 세션을 만들고 onSessionCreated로 주소를 바꾼다 (문서 2. 채팅 세션 생성)
  * coords는 "현재 위치 사용"을 눌러 보낼 때만 준다.
+ * 위치를 보낸 뒤 되묻기에 답할 때는 그 좌표를 다시 붙인다 (서버가 좌표를 저장하지 않음, heldCoords)
  */
 export async function sendQuestion(
   question: string,
@@ -136,7 +140,6 @@ export async function sendQuestion(
 ) {
   const content = question.trim()
   if (!content || isBusy(get().status)) return
-  lastLocated = coords ? { content, coords } : null
 
   clearInputGuardNotice()
   set({ status: 'sending', pendingQuestion: content, typingMessageId: null, errorMessage: null })
@@ -148,7 +151,11 @@ export async function sendQuestion(
       set({ sessionId })
       onSessionCreated?.(sessionId)
     }
-    const sent = await chatApi.sendMessage(sessionId, content, coords)
+    let sendCoords = coords
+    if (coords) rememberCoords(sessionId, coords)
+    else sendCoords = coordsForNext(sessionId, queryClient.getQueryData<ChatMessageHistory>(messagesKey(sessionId))?.messages)
+    lastLocated = sendCoords ? { content, coords: sendCoords } : null
+    const sent = await chatApi.sendMessage(sessionId, content, sendCoords)
     if (get().sessionId !== sessionId) return
     // 입력 검사 (TELME-119): 가림(MASKED)은 그대로 진행, 경고·재입력·제한은 답변을 만들지 않는다
     if (sent.inputGuard) {
