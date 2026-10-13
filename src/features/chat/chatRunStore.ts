@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { chatApi, subscribeExecution, type ChatCoordinates } from '../../api/chat'
 import { ApiError } from '../../api/client'
 import { queryClient } from '../../lib/queryClient'
+import { notifyAnswer, outcomeOfComplete, shouldNotifyFailure } from './answerNotifier'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
 
@@ -42,6 +43,11 @@ const get = useChatRun.getState
 const set = useChatRun.setState
 
 let stopStream: (() => void) | null = null
+/**
+ * 답변을 기다리는 중에 다른 대화로 옮긴 구독 (sessionId → 끊기).
+ * 서버는 구독과 상관없이 답변을 끝까지 만들므로, 끝나면 목록만 새로 읽고 알린다
+ */
+const background = new Map<number, () => void>()
 /** 현재 위치와 함께 보낸 마지막 질문. "다시 시도"로 같은 질문을 다시 보낼 때만 위치를 다시 붙인다 */
 let lastLocated: { content: string; coords: ChatCoordinates } | null = null
 let reconnectTries = 0
@@ -60,12 +66,43 @@ const refreshMessages = (sessionId: number) => {
   return queryClient.invalidateQueries({ queryKey: messagesKey(sessionId) })
 }
 
-/** 라우트의 대화가 바뀌면 부른다. 같은 대화면 아무것도 하지 않는다 */
+/**
+ * 라우트의 대화가 바뀌면 부른다. 같은 대화면 아무것도 하지 않는다.
+ * 답변을 기다리던 대화를 떠나면 구독을 끊지 않고 백그라운드로 넘기고, 그 대화로 돌아오면 다시 이어 받는다
+ */
 export function attachSession(sessionId: number | null) {
-  if (get().sessionId === sessionId) return
-  closeStream()
+  const prev = get()
+  if (prev.sessionId === sessionId) return
+  if (stopStream && prev.sessionId != null && prev.status === 'thinking') {
+    background.set(prev.sessionId, stopStream)
+    stopStream = null
+  } else {
+    closeStream()
+  }
   lastLocated = null
+  const resumed = sessionId != null ? background.get(sessionId) : undefined
+  if (resumed) {
+    background.delete(sessionId!)
+    stopStream = resumed
+    set({ ...initial, sessionId, status: 'thinking' })
+    return
+  }
   set({ ...initial, sessionId })
+}
+
+/** 로그아웃 등으로 이전 사용자의 대화를 더 따라가지 않을 때 */
+export function stopBackgroundStreams() {
+  background.forEach((stop) => stop())
+  background.clear()
+}
+
+/** 백그라운드로 넘어간 구독이 끝났으면 true (목록을 새로 읽고 알린 뒤) */
+function finishInBackground(sessionId: number, notify: () => void): boolean {
+  if (!background.has(sessionId)) return false
+  background.delete(sessionId)
+  void refreshMessages(sessionId)
+  notify()
+  return true
 }
 
 /** 답변 생성 SSE를 구독한다. 새로고침 후 runningExecutionId로 다시 붙을 때도 쓴다 */
@@ -75,21 +112,29 @@ function listen(sessionId: number, executionId: number) {
 
   stopStream = subscribeExecution(sessionId, executionId, {
     onComplete: async (state) => {
-      stopStream = null
       reconnectTries = 0
+      const notify = () => notifyAnswer(sessionId, outcomeOfComplete(state))
+      if (finishInBackground(sessionId, notify)) return
+      stopStream = null
       if (get().sessionId !== sessionId) return
+      notify()
       await refreshMessages(sessionId)
       const messageId = state.outputMessage?.messageId ?? null
       set({ pendingQuestion: null, typingMessageId: messageId, status: messageId ? 'streaming' : 'completed' })
     },
     onError: async (failure) => {
-      stopStream = null
       reconnectTries = 0
+      const notify = () => shouldNotifyFailure(failure) && notifyAnswer(sessionId, 'failed')
+      if (finishInBackground(sessionId, notify)) return
+      stopStream = null
       if (get().sessionId !== sessionId) return
+      notify()
       await refreshMessages(sessionId)
       set({ pendingQuestion: null, status: 'failed', errorMessage: failure.message })
     },
     onDisconnect: async () => {
+      // 백그라운드에서 끊기면 결과를 알 수 없으니 알리지 않는다. 그 대화를 다시 열면 runningExecutionId로 이어 받는다
+      if (finishInBackground(sessionId, () => {})) return
       stopStream = null
       if (get().sessionId !== sessionId) return
       // 연결만 끊긴 경우: 다시 읽어서 아직 만드는 중이면 다시 붙는다
