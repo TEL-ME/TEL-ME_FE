@@ -52,6 +52,24 @@ export const shouldNotifyFailure = (failure: ChatFailure) => failure.errorCode !
 
 const chatPath = (sessionId: number) => `/chat/${sessionId}`
 
+/** 답변이 왔지만 아직 열어 보지 않은 대화. 하단 메뉴 "상담"에 점으로 표시한다 */
+export const useUnreadAnswers = create<{ ids: number[] }>(() => ({ ids: [] }))
+
+function markUnread(sessionId: number) {
+  const { ids } = useUnreadAnswers.getState()
+  if (!ids.includes(sessionId)) useUnreadAnswers.setState({ ids: [...ids, sessionId] })
+}
+
+/** 그 대화를 열면 부른다 */
+export function clearUnread(sessionId: number) {
+  const { ids } = useUnreadAnswers.getState()
+  if (ids.includes(sessionId)) useUnreadAnswers.setState({ ids: ids.filter((id) => id !== sessionId) })
+}
+
+export function clearAllUnread() {
+  useUnreadAnswers.setState({ ids: [] })
+}
+
 /** 라우터가 이 모듈을 거쳐 chatRunStore를 불러오므로, 순환 참조를 피해 쓸 때 불러온다 */
 const openChat = (sessionId: number) =>
   void import('../../app/router').then(({ router }) => router.navigate(chatPath(sessionId)))
@@ -74,13 +92,15 @@ function markTitle() {
 
 export function notifyAnswer(sessionId: number, outcome: AnswerOutcome) {
   const message = MESSAGE[outcome]
+  // 그 대화를 보고 있으면 탭이 뒤에 있어도 돌아왔을 때 바로 보이므로 표시하지 않는다
+  if (window.location.pathname !== chatPath(sessionId)) markUnread(sessionId)
 
   if (document.visibilityState === 'hidden') {
     markTitle()
     if (!browserNotifyOn(useAnswerNotify.getState().browserEnabled)) return
     try {
-      // 같은 대화의 알림은 하나만 남긴다
-      const n = new Notification('TEL-ME', { body: message, tag: `telme-chat-${sessionId}` })
+      // 같은 대화의 알림은 하나만 남기되, 바꿔 넣을 때도 다시 띄운다 (renotify가 없으면 크롬이 조용히 교체한다)
+      const n = new Notification('TEL-ME', { body: message, tag: `telme-chat-${sessionId}`, renotify: true } as NotificationOptions)
       n.onclick = () => {
         window.focus()
         openChat(sessionId)

@@ -21,7 +21,7 @@ vi.mock('./answerNotifier', async (importOriginal) => ({
   notifyAnswer: vi.fn(),
 }))
 
-const { attachSession, resumeExecution, stopBackgroundStreams, useChatRun } = await import('./chatRunStore')
+const { attachSession, resumeExecution, stopBackgroundStreams, useBackgroundRuns, useChatRun } = await import('./chatRunStore')
 const { notifyAnswer } = await import('./answerNotifier')
 
 const done = (sessionId: number): ChatExecutionState => ({
@@ -47,9 +47,11 @@ describe('답변을 기다리던 대화를 떠났을 때', () => {
 
     expect(subs[0].stop).not.toHaveBeenCalled()
     expect(useChatRun.getState()).toMatchObject({ sessionId: 2, status: 'idle' })
+    expect(useBackgroundRuns.getState().ids).toEqual([1])
 
     await subs[0].handlers.onComplete(done(1))
     expect(notifyAnswer).toHaveBeenCalledWith(1, 'answered')
+    expect(useBackgroundRuns.getState().ids).toEqual([])
     // 지금 보는 대화의 상태는 건드리지 않는다
     expect(useChatRun.getState()).toMatchObject({ sessionId: 2, status: 'idle' })
   })
@@ -61,6 +63,7 @@ describe('답변을 기다리던 대화를 떠났을 때', () => {
     attachSession(1)
 
     expect(useChatRun.getState()).toMatchObject({ sessionId: 1, status: 'thinking' })
+    expect(useBackgroundRuns.getState().ids).toEqual([])
     resumeExecution(1, 10)
     expect(subs).toHaveLength(1)
 

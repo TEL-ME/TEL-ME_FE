@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { chatApi, subscribeExecution, type ChatCoordinates } from '../../api/chat'
 import { ApiError } from '../../api/client'
 import { queryClient } from '../../lib/queryClient'
-import { notifyAnswer, outcomeOfComplete, shouldNotifyFailure } from './answerNotifier'
+import { clearAllUnread, notifyAnswer, outcomeOfComplete, shouldNotifyFailure } from './answerNotifier'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
 
@@ -48,6 +48,10 @@ let stopStream: (() => void) | null = null
  * 서버는 구독과 상관없이 답변을 끝까지 만들므로, 끝나면 목록만 새로 읽고 알린다
  */
 const background = new Map<number, () => void>()
+
+/** 백그라운드에서 답변을 만드는 중인 대화. 하단 메뉴 "상담"에 생성 중 표시를 한다 */
+export const useBackgroundRuns = create<{ ids: number[] }>(() => ({ ids: [] }))
+const syncBackground = () => useBackgroundRuns.setState({ ids: [...background.keys()] })
 /** 현재 위치와 함께 보낸 마지막 질문. "다시 시도"로 같은 질문을 다시 보낼 때만 위치를 다시 붙인다 */
 let lastLocated: { content: string; coords: ChatCoordinates } | null = null
 let reconnectTries = 0
@@ -76,6 +80,7 @@ export function attachSession(sessionId: number | null) {
   if (stopStream && prev.sessionId != null && prev.status === 'thinking') {
     background.set(prev.sessionId, stopStream)
     stopStream = null
+    syncBackground()
   } else {
     closeStream()
   }
@@ -83,6 +88,7 @@ export function attachSession(sessionId: number | null) {
   const resumed = sessionId != null ? background.get(sessionId) : undefined
   if (resumed) {
     background.delete(sessionId!)
+    syncBackground()
     stopStream = resumed
     set({ ...initial, sessionId, status: 'thinking' })
     return
@@ -90,16 +96,19 @@ export function attachSession(sessionId: number | null) {
   set({ ...initial, sessionId })
 }
 
-/** 로그아웃 등으로 이전 사용자의 대화를 더 따라가지 않을 때 */
+/** 로그아웃 등으로 이전 사용자의 대화를 더 따라가지 않을 때 (도착 표시도 지운다) */
 export function stopBackgroundStreams() {
   background.forEach((stop) => stop())
   background.clear()
+  syncBackground()
+  clearAllUnread()
 }
 
 /** 백그라운드로 넘어간 구독이 끝났으면 true (목록을 새로 읽고 알린 뒤) */
 function finishInBackground(sessionId: number, notify: () => void): boolean {
   if (!background.has(sessionId)) return false
   background.delete(sessionId)
+  syncBackground()
   void refreshMessages(sessionId)
   notify()
   return true

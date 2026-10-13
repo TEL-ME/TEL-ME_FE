@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatExecutionState } from '../../api/types'
 import { useToastStore } from '../../stores/toastStore'
-import { notifyAnswer, outcomeOfComplete, useAnswerNotify } from './answerNotifier'
+import { clearUnread, notifyAnswer, outcomeOfComplete, useAnswerNotify, useUnreadAnswers } from './answerNotifier'
 
 const setVisibility = (state: DocumentVisibilityState) =>
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
@@ -39,6 +39,22 @@ describe('notifyAnswer', () => {
     setVisibility('visible')
     document.dispatchEvent(new Event('visibilitychange'))
     useAnswerNotify.setState({ browserEnabled: false })
+    useUnreadAnswers.setState({ ids: [] })
+  })
+
+  it('보고 있지 않은 대화의 답변만 도착 표시를 남기고, 그 대화를 열면 지운다', () => {
+    window.history.replaceState(null, '', '/chat/1')
+    notifyAnswer(1, 'answered')
+    expect(useUnreadAnswers.getState().ids).toEqual([])
+
+    window.history.replaceState(null, '', '/stores')
+    notifyAnswer(1, 'answered')
+    notifyAnswer(1, 'answered')
+    notifyAnswer(2, 'failed')
+    expect(useUnreadAnswers.getState().ids).toEqual([1, 2])
+
+    clearUnread(1)
+    expect(useUnreadAnswers.getState().ids).toEqual([2])
   })
 
   it('그 대화를 보고 있으면 알리지 않는다', () => {
@@ -65,7 +81,7 @@ describe('notifyAnswer', () => {
 
     useAnswerNotify.setState({ browserEnabled: true })
     notifyAnswer(2, 'failed')
-    expect(NotificationMock).toHaveBeenCalledWith('TEL-ME', { body: '답변을 만들지 못했어요', tag: 'telme-chat-2' })
+    expect(NotificationMock).toHaveBeenCalledWith('TEL-ME', { body: '답변을 만들지 못했어요', tag: 'telme-chat-2', renotify: true })
     expect(document.title).toBe(`(2) ${title}`)
 
     setVisibility('visible')
