@@ -22,6 +22,37 @@ export function UserBubble({ children, blocked = false }: { children: ReactNode;
   )
 }
 
+/**
+ * 서버가 입력을 검사해 저장하기 전까지 내 질문 자리에 두는 말풍선.
+ * 민감정보는 서버가 가린 뒤에만 보여야 해서, 입력한 원문은 그리지 않는다 (TELME-119).
+ * failed: 서버에 닿지 못해 검사 결과가 없는 경우
+ */
+export function PendingUserBubble({ failed = false }: { failed?: boolean }) {
+  return (
+    <div className="tm-rise flex justify-end">
+      <div
+        role="status"
+        className={`max-w-[82%] rounded-[22px] rounded-br-md px-4 py-3 text-[15px] leading-6 ${
+          failed ? 'border-[1.5px] border-dashed border-line bg-surface-2 text-ink-sub' : 'bg-brand text-white opacity-80'
+        }`}
+      >
+        {failed ? (
+          '보내지 못한 질문이에요'
+        ) : (
+          <span className="flex items-center gap-2">
+            질문을 확인하고 있어요
+            <span aria-hidden className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="tm-dot h-1.5 w-1.5 rounded-full bg-white" style={{ animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </span>
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** default: 일반 답변 · ask: 조건 확인(추가 질문) · notice: 근거 없음·범위 밖 · error: 실패 */
 export type BotTone = 'default' | 'ask' | 'notice' | 'error'
 

@@ -4,7 +4,7 @@ import type { ChatMessage } from '../../../api/types'
 import FeedbackButtons from '../../feedback/FeedbackButtons'
 import { isBusy, type ChatStatus } from '../chatRunStore'
 import AnswerText from './AnswerText'
-import { BotBubble, UserBubble, type BotTone } from './Bubbles'
+import { BotBubble, PendingUserBubble, UserBubble, type BotTone } from './Bubbles'
 import FollowUps from './FollowUps'
 import LocationAskChips from './LocationAskChips'
 import SourceList from './SourceList'
@@ -17,7 +17,10 @@ interface MessageListProps {
   sessionId: number | null
   isUser: boolean
   messages: ChatMessage[]
+  /** 서버에 저장되기 전의 내 질문 (원문). 그리지 않고 대기 말풍선으로 대신한다 */
   pendingQuestion: string | null
+  /** 그 질문이 저장된 메시지 번호 (전송 응답에서 받는다) */
+  sentMessageId?: number | null
   status: ChatStatus
   typingMessageId: number | null
   errorMessage: string | null
@@ -56,6 +59,7 @@ export default function MessageList({
   isUser,
   messages,
   pendingQuestion,
+  sentMessageId = null,
   status,
   typingMessageId,
   errorMessage,
@@ -71,7 +75,10 @@ export default function MessageList({
     pendingQuestion,
   )
   const last = sorted[sorted.length - 1]
-  const showPending = pendingQuestion != null && !(last?.role === 'USER' && last.content === pendingQuestion)
+  // 저장된 질문이 목록에 오면 대기 말풍선을 내린다. 서버가 내용을 가렸을 수 있어 글자가 아니라 번호로 찾는다
+  const sentArrived = sentMessageId != null && sorted.some((m) => m.messageId === sentMessageId)
+  const showPending =
+    pendingQuestion != null && !sentArrived && !(last?.role === 'USER' && last.content === pendingQuestion)
   const lastIsGenerating = last?.role === 'ASSISTANT' && last.status === 'GENERATING'
   const showThinking = (status === 'sending' || status === 'thinking') && !lastIsGenerating
   // 질문이 서버에 저장되기 전에 실패한 경우 (세션 생성·전송 실패)
@@ -176,7 +183,7 @@ export default function MessageList({
         )
       })}
 
-      {showPending && <UserBubble>{pendingQuestion}</UserBubble>}
+      {showPending && <PendingUserBubble failed={showSendError} />}
 
       {showThinking && (
         <BotBubble>

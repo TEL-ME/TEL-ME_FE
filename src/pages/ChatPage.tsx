@@ -265,6 +265,7 @@ export default function ChatPage() {
               isUser={isUser}
               messages={messages}
                 pendingQuestion={own ? run.pendingQuestion : null}
+                sentMessageId={own ? run.sentMessageId : null}
                 status={status}
                 typingMessageId={own ? run.typingMessageId : null}
                 errorMessage={own ? run.errorMessage : null}

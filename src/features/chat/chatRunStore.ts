@@ -22,8 +22,13 @@ interface ChatRunState {
   /** 지금 화면이 보고 있는 대화. 메인(새 대화)이면 null */
   sessionId: number | null
   status: ChatStatus
-  /** 서버에 저장되기 전까지 보여 줄 내 질문 */
+  /**
+   * 서버에 저장되기 전의 내 질문 (원문). 화면에는 그리지 않고 대기 말풍선만 보여 준다.
+   * 서버가 민감정보를 가린 뒤 저장한 내용이 메시지 목록으로 오면 그것을 보여 준다 (TELME-119)
+   */
   pendingQuestion: string | null
+  /** 방금 보낸 질문이 서버에 저장된 메시지 번호. 목록에 이 번호가 보이면 대기 말풍선을 내린다 */
+  sentMessageId: number | null
   /** 타자 효과로 보여 줄 답변 메시지 */
   typingMessageId: number | null
   errorMessage: string | null
@@ -33,6 +38,7 @@ const initial: ChatRunState = {
   sessionId: null,
   status: 'idle',
   pendingQuestion: null,
+  sentMessageId: null,
   typingMessageId: null,
   errorMessage: null,
 }
@@ -142,7 +148,7 @@ export async function sendQuestion(
   if (!content || isBusy(get().status)) return
 
   clearInputGuardNotice()
-  set({ status: 'sending', pendingQuestion: content, typingMessageId: null, errorMessage: null })
+  set({ status: 'sending', pendingQuestion: content, sentMessageId: null, typingMessageId: null, errorMessage: null })
   let sessionId = get().sessionId
   try {
     if (sessionId == null) {
@@ -157,13 +163,14 @@ export async function sendQuestion(
     lastLocated = sendCoords ? { content, coords: sendCoords } : null
     const sent = await chatApi.sendMessage(sessionId, content, sendCoords)
     if (get().sessionId !== sessionId) return
+    set({ sentMessageId: sent.messageId ?? null })
     // 입력 검사 (TELME-119): 가림(MASKED)은 그대로 진행, 경고·재입력·제한은 답변을 만들지 않는다
     if (sent.inputGuard) {
       applyInputGuard(sent.inputGuard)
       if (sent.inputGuard.action === 'MASKED') showToast(sent.inputGuard.message)
     }
     await refreshMessages(sessionId)
-    set({ pendingQuestion: null })
+    set({ pendingQuestion: null, sentMessageId: null })
     if (sent.executionId == null) {
       set({ status: 'idle' })
       return
