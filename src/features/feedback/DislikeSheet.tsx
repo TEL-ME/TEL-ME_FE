@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { DislikeReason } from '../../api/types'
-import { closeDislikeSheet, currentFeedback, DISLIKE_REASONS, saveDislike, useDislikeSheet } from './feedbackActions'
+import { closeDislikeSheet, currentFeedback, saveDislike, useDislikeSheet } from './feedbackActions'
+import { DISLIKE_REASONS, needsComment } from './reasons'
 
 /** 싫어요 이유 선택 (Sheet-Dislike) */
 export default function DislikeSheet() {
@@ -24,8 +25,12 @@ function SheetBody() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // 기타는 의견이 필수다. 공백만 쓴 의견은 서버도 받지 않는다
+  const commentRequired = needsComment(reason)
+  const canSend = reason != null && (!commentRequired || comment.trim() !== '')
+
   const send = () => {
-    if (!reason) return
+    if (!reason || !canSend) return
     closeDislikeSheet()
     void saveDislike(target, currentFeedback(target), reason, comment)
   }
@@ -64,15 +69,20 @@ function SheetBody() {
         </div>
         <label htmlFor={commentId} className="flex flex-col gap-2 text-[13px] font-semibold text-ink-sub">
           <span>
-            더 남기고 싶은 말 <span className="font-normal text-ink-muted">(선택)</span>
+            {commentRequired ? '어떤 점이 아쉬웠는지 알려주세요' : '더 남기고 싶은 말'}{' '}
+            <span className={commentRequired ? 'font-bold text-brand-text' : 'font-normal text-ink-muted'}>
+              {commentRequired ? '(필수)' : '(선택)'}
+            </span>
           </span>
           <textarea
             id={commentId}
             rows={3}
             maxLength={1000}
             value={comment}
+            required={commentRequired}
+            aria-required={commentRequired}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="무러바라가 더 나아질 수 있게 알려주세요"
+            placeholder={commentRequired ? '예: 원하는 답이 아니었어요' : '무러바라가 더 나아질 수 있게 알려주세요'}
             className="w-full resize-none rounded-2xl bg-surface-2 p-3 text-[15px] font-normal leading-[22px] text-ink outline-none placeholder:text-ink-muted"
           />
         </label>
@@ -87,7 +97,7 @@ function SheetBody() {
           <button
             type="button"
             onClick={send}
-            disabled={!reason}
+            disabled={!canSend}
             className="col-span-2 min-h-[52px] rounded-2xl bg-brand text-base font-bold text-white disabled:bg-line disabled:text-ink-muted"
           >
             보내기

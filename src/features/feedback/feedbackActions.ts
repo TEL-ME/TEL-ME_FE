@@ -6,11 +6,6 @@ import { showToast } from '../../stores/toastStore'
 import { openLoginSheet } from '../auth/loginSheetStore'
 import { findMessage, patchMessage } from '../chat/queries'
 
-export const DISLIKE_REASONS: { code: DislikeReason; label: string }[] = [
-  { code: 'WRONG_INFO', label: '정보가 정확하지 않아요' },
-  { code: 'NOT_RELATED', label: '질문과 관련이 없어요' },
-  { code: 'HARD_TO_READ', label: '이해하기 어려워요' },
-]
 
 interface Target {
   sessionId: number

@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { FaqCategory } from './faq'
 
 /** 관리자 API (TEL-ME_BE develop 기준, /api/v1/admin/** — ADMIN만) */
 
@@ -10,21 +11,8 @@ export interface Page {
 }
 
 // ---- FAQ ----
-export const FAQ_CATEGORIES = [
-  ['BILLING', '요금'],
-  ['PLAN', '요금제'],
-  ['USIM', '유심'],
-  ['SUBSCRIBE', '가입'],
-  ['PORTING', '번호이동'],
-  ['NAME_CHANGE', '명의변경'],
-  ['TERMINATE', '해지'],
-  ['DEVICE', '단말'],
-  ['ROAMING', '로밍'],
-  ['SERVICE', '서비스'],
-] as const
-export type FaqCategory = (typeof FAQ_CATEGORIES)[number][0]
-export const categoryLabel = (c: string) => FAQ_CATEGORIES.find(([k]) => k === c)?.[1] ?? c
-
+// 카테고리는 사용자 FAQ 화면과 같이 쓴다
+export { categoryLabel, FAQ_CATEGORIES, type FaqCategory } from './faq'
 export type FaqStatus = 'ACTIVE' | 'HIDDEN' | 'DELETED'
 export type FaqStatusFilter = FaqStatus | 'ALL'
 export type FaqSort = 'RECENT' | 'CITATION_DESC' | 'CITATION_ASC'
@@ -84,7 +72,7 @@ export const adminFaqApi = {
 }
 
 // ---- 답변 품질: 싫어요 피드백 ----
-export type ReasonCode = 'WRONG_INFO' | 'NOT_RELATED' | 'HARD_TO_READ'
+export type ReasonCode = 'WRONG_INFO' | 'NOT_RELATED' | 'HARD_TO_READ' | 'OTHER'
 export type HandledFilter = 'UNHANDLED' | 'HANDLED' | 'ALL'
 
 export interface AdminSource {

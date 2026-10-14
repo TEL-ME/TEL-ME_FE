@@ -30,7 +30,8 @@ export interface ChatSessionList {
 }
 
 export type Rating = 'LIKE' | 'DISLIKE'
-export type DislikeReason = 'WRONG_INFO' | 'NOT_RELATED' | 'HARD_TO_READ'
+/** OTHER(기타)는 의견(comment)이 필수 */
+export type DislikeReason = 'WRONG_INFO' | 'NOT_RELATED' | 'HARD_TO_READ' | 'OTHER'
 
 export interface MyFeedback {
   rating: Rating
