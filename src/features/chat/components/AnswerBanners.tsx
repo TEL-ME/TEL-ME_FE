@@ -1,6 +1,6 @@
 import { ChevronRight, X } from 'lucide-react'
 import { useEffect } from 'react'
-import avatarImg from '../../../assets/mudo/mudo-avatar.png'
+import logoImg from '../../../assets/mudo/mudo-logo.png'
 import { dismissBanner, OUTCOME_TEXT, openBanner, useAnswerBanners, type AnswerBanner } from '../answerNotifier'
 
 /** 알림이 떠 있는 시간 */
@@ -25,7 +25,7 @@ function Banner({ banner }: { banner: AnswerBanner }) {
         onClick={() => openBanner(banner)}
         className="flex min-h-[64px] min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 pr-1 text-left"
       >
-        <img src={avatarImg} alt="" className="h-10 w-10 shrink-0 rounded-full bg-brand-soft object-cover" />
+        <img src={logoImg} alt="" className="h-10 w-10 shrink-0 rounded-[10px] object-cover" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-[15px] font-bold leading-5 text-ink">{banner.title}</span>
           <span className="flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-sub">
