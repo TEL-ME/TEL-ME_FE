@@ -12,6 +12,7 @@ import AdminStoresPage from '../pages/admin/AdminStoresPage'
 import AdminSystemPage from '../pages/admin/AdminSystemPage'
 import ChatPage from '../pages/ChatPage'
 import EmailLoginPage from '../pages/EmailLoginPage'
+import FaqPage from '../pages/FaqPage'
 import IntroPage from '../pages/IntroPage'
 import MyPage from '../pages/MyPage'
 import OnboardingPage from '../pages/OnboardingPage'
@@ -34,6 +35,8 @@ export const router = createBrowserRouter([
       { path: '/stores', element: <StoresPage /> },
       { path: '/stores/region', element: <StoreRegionPage /> },
       { path: '/stores/:storeId', element: <StoreDetailPage /> },
+      // 자주 묻는 질문. ?id=로 오면 그 FAQ를 맨 위에 펼친다
+      { path: '/faq', element: <FaqPage /> },
       { path: '/my', element: <MyPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/terms', element: <Placeholder title="이용약관" note="내용 준비 중" /> },

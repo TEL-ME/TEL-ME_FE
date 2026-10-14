@@ -1,4 +1,4 @@
-import { MapIcon, MessageCircle, Settings, UserRound, type LucideIcon } from 'lucide-react'
+import { BookOpenText, MapIcon, MessageSquare, Settings, UserRound, type LucideIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import Toast from '../components/Toast'
@@ -15,25 +15,30 @@ interface NavItem {
   icon: LucideIcon
   match: (path: string) => boolean
   badge?: ChatBadge
+  /** 가운데 강조 버튼 (상담) */
+  center?: boolean
 }
 
 /** 하단 메뉴 "상담" 표시: 보고 있지 않은 대화의 답변을 만드는 중 · 답변 도착 */
 type ChatBadge = 'generating' | 'arrived' | null
 
-function NavBadge({ badge }: { badge: ChatBadge }) {
-  if (badge === 'arrived') {
-    return <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-danger ring-2 ring-surface" />
-  }
-  if (badge === 'generating') {
-    return (
-      <span aria-hidden className="absolute -right-3 -top-1 flex gap-[2px]">
-        {[0, 0.15, 0.3].map((delay) => (
-          <span key={delay} className="tm-dot h-1 w-1 rounded-full bg-brand" style={{ animationDelay: `${delay}s` }} />
-        ))}
-      </span>
-    )
-  }
-  return null
+/** 가운데 상담 버튼: 분홍 원 안의 말풍선. 답변을 만드는 중이면 말풍선 안에 점 세 개, 도착하면 오른쪽 위 빨간 점 */
+function ChatButton({ badge }: { badge: ChatBadge }) {
+  return (
+    <span className="relative -mt-[30px] flex h-[52px] w-[52px] items-center justify-center rounded-full border-4 border-surface bg-brand shadow-[0_6px_16px_rgba(184,74,111,0.35)]">
+      <MessageSquare size={24} strokeWidth={1.8} fill="#fff" className="text-white" aria-hidden />
+      {badge === 'generating' && (
+        <span aria-hidden className="absolute left-1/2 top-[19px] flex -translate-x-1/2 gap-[2px]">
+          {[0, 0.15, 0.3].map((delay) => (
+            <span key={delay} className="tm-dot h-1 w-1 rounded-full bg-brand" style={{ animationDelay: `${delay}s` }} />
+          ))}
+        </span>
+      )}
+      {badge === 'arrived' && (
+        <span aria-hidden className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-surface" />
+      )}
+    </span>
+  )
 }
 
 const BADGE_LABEL: Record<Exclude<ChatBadge, null>, string> = { generating: '답변 준비 중', arrived: '새 답변' }
@@ -73,14 +78,16 @@ export default function AppLayout() {
   if (pathname === '/' && !hasOnboarded()) return <Navigate to="/onboarding" replace />
 
   const nav: NavItem[] = [
+    { to: '/faq', label: 'FAQ', icon: BookOpenText, match: (p) => p.startsWith('/faq') },
+    { to: '/stores', label: '매장', icon: MapIcon, match: (p) => p.startsWith('/stores') },
     {
       to: lastSessionId ? `/chat/${lastSessionId}` : '/',
       label: '상담',
-      icon: MessageCircle,
+      icon: MessageSquare,
       match: (p) => p === '/' || p.startsWith('/chat'),
       badge: chatBadge,
+      center: true,
     },
-    { to: '/stores', label: '매장', icon: MapIcon, match: (p) => p.startsWith('/stores') },
     { to: '/my', label: '마이', icon: UserRound, match: (p) => p.startsWith('/my') },
     { to: '/settings', label: '설정', icon: Settings, match: (p) => p.startsWith('/settings') },
   ]
@@ -90,9 +97,10 @@ export default function AppLayout() {
       <div className="flex min-h-0 flex-1 flex-col">
         <Outlet />
       </div>
-      <nav aria-label="주요 메뉴" className="shrink-0 bg-surface pb-[env(safe-area-inset-bottom)]">
+      {/* 가운데 상담 버튼이 위로 튀어나와서, 매장 목록 시트(z-20)보다 위 · 위치 안내 창(z-30)·대화 목록(z-40)보다 아래 */}
+      <nav aria-label="주요 메뉴" className="relative z-[25] shrink-0 bg-surface pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-[480px]">
-          {nav.map(({ to, label, icon: Icon, match, badge }) => {
+          {nav.map(({ to, label, icon: Icon, match, badge, center }) => {
             const active = match(pathname)
             return (
               <NavLink
@@ -100,13 +108,19 @@ export default function AppLayout() {
                 to={to}
                 aria-current={active ? 'page' : undefined}
                 className={`flex flex-1 flex-col items-center gap-1 pb-3 pt-2.5 text-xs ${
-                  active ? 'font-bold text-ink' : 'font-medium text-ink-muted'
+                  center
+                    ? `font-bold ${active ? 'text-brand-text' : 'text-ink-sub'}`
+                    : active
+                      ? 'font-bold text-ink'
+                      : 'font-medium text-ink-muted'
                 }`}
               >
-                <span className="relative">
-                  <Icon size={24} strokeWidth={1.8} fill={active ? 'currentColor' : 'none'} aria-hidden />
-                  {badge && <NavBadge badge={badge} />}
-                </span>
+                {center ? (
+                  <ChatButton badge={badge ?? null} />
+                ) : (
+                  // 책 아이콘은 채우면 안의 줄이 안 보여 채우지 않는다
+                  <Icon size={24} strokeWidth={1.8} fill={active && Icon !== BookOpenText ? 'currentColor' : 'none'} aria-hidden />
+                )}
                 {label}
                 {badge && <span className="sr-only">, {BADGE_LABEL[badge]}</span>}
               </NavLink>
