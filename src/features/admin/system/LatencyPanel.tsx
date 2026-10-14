@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { adminSystemApi, taskLabel, type LatencyStats } from '../../../api/admin'
+import { adminSystemApi, HIDDEN_TASKS, taskLabel, type LatencyStats } from '../../../api/admin'
 import { daysAgoIso, formatAdminTime } from '../../../lib/date'
 import { Card, Empty, FilterSelect, TableHead } from '../components/AdminUi'
 import { formatMs } from './format'
@@ -26,7 +26,7 @@ export default function LatencyPanel() {
     placeholderData: keepPreviousData,
   })
   const d = latency.data
-  const tasks = d ? [...d.tasks].sort((a, b) => (b.p95Ms ?? -1) - (a.p95Ms ?? -1)) : []
+  const tasks = d ? d.tasks.filter((t) => !HIDDEN_TASKS.has(t.taskType)).sort((a, b) => (b.p95Ms ?? -1) - (a.p95Ms ?? -1)) : []
   const maxP95 = Math.max(1, ...tasks.map((t) => t.p95Ms ?? 0))
 
   return (

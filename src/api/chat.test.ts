@@ -21,12 +21,25 @@ describe('chatApi.sendMessage', () => {
   it('평소에는 질문만 보낸다', async () => {
     const fetchMock = stubFetch()
     await chatApi.sendMessage(1, '유심 분실했어요')
-    expect(bodyOf(fetchMock)).toEqual({ content: '유심 분실했어요' })
+    expect(bodyOf(fetchMock)).toEqual({ content: '유심 분실했어요', requestId: expect.any(String) })
   })
 
   it('현재 위치를 쓰기로 했을 때만 위도·경도를 함께 보낸다', async () => {
     const fetchMock = stubFetch()
     await chatApi.sendMessage(1, '현재 위치에서 가까운 매장을 찾아줘', { latitude: 37.4979, longitude: 127.0276 })
-    expect(bodyOf(fetchMock)).toEqual({ content: '현재 위치에서 가까운 매장을 찾아줘', latitude: 37.4979, longitude: 127.0276 })
+    expect(bodyOf(fetchMock)).toEqual({
+      content: '현재 위치에서 가까운 매장을 찾아줘',
+      latitude: 37.4979,
+      longitude: 127.0276,
+      requestId: expect.any(String),
+    })
+  })
+
+  it('보낼 때마다 다른 requestId를 붙인다', async () => {
+    const fetchMock = stubFetch()
+    await chatApi.sendMessage(1, '유심 분실했어요')
+    await chatApi.sendMessage(1, '유심 분실했어요')
+    const ids = fetchMock.mock.calls.map((c) => JSON.parse(String((c[1] as RequestInit).body)).requestId)
+    expect(ids[0]).not.toBe(ids[1])
   })
 })

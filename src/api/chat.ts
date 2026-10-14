@@ -11,6 +11,15 @@ import type {
 
 const BASE = '/api/v1/chat'
 
+/** 전송마다 새 UUID (randomUUID가 없는 오래된 브라우저·http 환경은 직접 만든다) */
+function newRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
 /** 질문과 함께 보내는 현재 위치 */
 export interface ChatCoordinates {
   latitude: number
@@ -34,7 +43,12 @@ export const chatApi = {
   sendMessage: (sessionId: number, content: string, coords?: ChatCoordinates) =>
     api<ChatMessageSendResponse>(`${BASE}/sessions/${sessionId}/messages`, {
       method: 'POST',
-      body: coords ? { content, latitude: coords.latitude, longitude: coords.longitude } : { content },
+      body: {
+        content,
+        ...(coords ? { latitude: coords.latitude, longitude: coords.longitude } : {}),
+        // 같은 전송이 두 번 들어가지 않게 (서버가 같은 requestId는 한 번만 처리)
+        requestId: newRequestId(),
+      },
     }),
 
   /**

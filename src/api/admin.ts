@@ -199,7 +199,29 @@ export interface DashboardDay {
   errorCount: number
 }
 
+/** 질문 의도: FAQ 문의 · 매장 찾기 · 둘 다 · 미분류 */
+export type IntentType = 'FAQ' | 'STORE' | 'BOTH' | 'UNKNOWN'
+/** RULE: 규칙(장애 대체·규칙 보정 포함) · LLM · UNRECORDED: 방법 기록 없음 */
+export type ClassificationMethod = 'RULE' | 'LLM' | 'UNRECORDED'
+
+/**
+ * GET /admin/dashboard/intent-distribution
+ * - 0건인 항목도 항상 들어 있고 순서가 고정이다 (의도 FAQ·STORE·BOTH·UNKNOWN / 방법 RULE·LLM·UNRECORDED)
+ * - percentage는 소수 둘째 자리 반올림이라 합이 100이 아닐 수 있다
+ * - to는 끝 시각 제외. 기간을 비우면 응답의 from·to가 null(전체 기간). 응답 시각은 UTC
+ */
+export interface IntentDistribution {
+  from: string | null
+  to: string | null
+  /** 기간 안 분류 기록 수 (전체 질문 수와 다를 수 있음) */
+  totalCount: number
+  intents: { intent: IntentType; count: number; percentage: number }[]
+  methods: { method: ClassificationMethod; count: number; percentage: number }[]
+}
+
 export const adminDashboardApi = {
+  intentDistribution: (q: { from?: string; to?: string } = {}) =>
+    api<IntentDistribution>('/api/v1/admin/dashboard/intent-distribution', { query: { ...q } }),
   summary: (q: { from?: string; to?: string } = {}) => api<DashboardSummary>('/api/v1/admin/dashboard', { query: { ...q } }),
   daily: () => api<{ days: DashboardDay[] }>('/api/v1/admin/dashboard/daily'),
 }
@@ -227,6 +249,13 @@ export const LLM_TASKS: [LlmTaskType, string][] = [
   ['SESSION_TITLE', '대화 제목'],
 ]
 export const taskLabel = (t: string) => LLM_TASKS.find(([k]) => k === t)?.[1] ?? t
+
+/**
+ * 운영 상태 화면에서 숨기는 작업: 문맥 연결·되묻기·추천 질문.
+ * 대부분 고정 문장·규칙으로 처리돼 LLM 호출 기록이 거의 남지 않아 0건으로만 보인다.
+ */
+export const HIDDEN_TASKS = new Set<string>(['CONTEXT_RESOLUTION', 'CLARIFICATION', 'FOLLOW_UP'])
+export const VISIBLE_TASKS = LLM_TASKS.filter(([k]) => !HIDDEN_TASKS.has(k))
 
 export type LlmErrorType = 'TIMEOUT' | 'CONNECTION_FAILED' | 'MODEL_ERROR'
 
@@ -261,12 +290,38 @@ export interface Latency {
   tasks: (LatencyStats & { taskType: LlmTaskType })[]
 }
 
+/** min 이상 max 미만 (마지막 칸만 1.0 포함) */
+export interface SearchScoreBucket {
+  min: number
+  max: number
+  count: number
+}
+
+/**
+ * 검색 점수 분포 (TELME-123). 상담에서 질문마다 처음 한 FAQ 검색 기준.
+ * - total: 질문 수 / scored: 질문+답변 벡터(Q_A) 1위 점수가 있는 질문 수(= buckets 합)
+ * - passed: 첫 검색으로 근거를 찾은 질문 / refinedPassed: 첫 검색은 비었지만 정제 질문으로 찾은 질문
+ * - aboveThreshold: 1위 점수가 검색 당시 임계값 이상인 질문 / buckets: 0~1을 0.05 간격 20칸
+ */
+export interface SearchScores {
+  threshold: number
+  total: number
+  scored: number
+  passed: number
+  refinedPassed: number
+  aboveThreshold: number
+  buckets: SearchScoreBucket[]
+}
+
 export const adminSystemApi = {
   /** 비우면 errorType은 세 종류 전체, taskType은 모든 작업 */
   errors: (q: PeriodQuery & { errorType?: LlmErrorType; taskType?: LlmTaskType }) =>
     api<{ errors: LlmErrorItem[] } & Page>('/api/v1/admin/system/errors', { query: { ...q } }),
   /** 기간을 비우면 최근 24시간 */
   latency: (q: { from?: string; to?: string } = {}) => api<Latency>('/api/v1/admin/system/latency', { query: { ...q } }),
+  /** 기간을 비우면 전체 (기록은 90일 보관) */
+  searchScores: (q: { from?: string; to?: string } = {}) =>
+    api<SearchScores>('/api/v1/admin/system/search-scores', { query: { ...q } }),
 }
 
 // ---- 매장 ----

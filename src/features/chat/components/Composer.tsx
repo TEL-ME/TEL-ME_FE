@@ -4,13 +4,16 @@ import { useState, type FormEvent, type KeyboardEvent } from 'react'
 interface ComposerProps {
   busy: boolean
   placeholder?: string
+  /** 있으면 입력을 막고 이 문구를 보여 준다 (예: 일시 제한 남은 시간) */
+  lockedText?: string | null
   onSend: (question: string) => void
 }
 
 const MAX_LENGTH = 300
 
-export default function Composer({ busy, placeholder = '어떤 것이 궁금하세요?', onSend }: ComposerProps) {
+export default function Composer({ busy: generating, placeholder = '어떤 것이 궁금하세요?', lockedText, onSend }: ComposerProps) {
   const [value, setValue] = useState('')
+  const busy = generating || !!lockedText
   const canSend = !busy && value.trim().length > 0
 
   const submit = () => {
@@ -46,7 +49,7 @@ export default function Composer({ busy, placeholder = '어떤 것이 궁금하�
         disabled={busy}
         enterKeyHint="send"
         maxLength={MAX_LENGTH}
-        placeholder={busy ? '무러바라가 답변을 준비하고 있어요' : placeholder}
+        placeholder={lockedText || (generating ? '무러바라가 답변을 준비하고 있어요' : placeholder)}
         className="min-w-0 flex-1 bg-transparent py-2.5 text-base leading-6 text-ink outline-none placeholder:text-ink-muted"
       />
       <button
