@@ -4,8 +4,10 @@ import type { ChatExecutionState } from '../../api/types'
 
 const subs: { sessionId: number; handlers: ExecutionHandlers; stop: ReturnType<typeof vi.fn> }[] = []
 
+const chatApi = { sendMessage: vi.fn() }
+
 vi.mock('../../api/chat', () => ({
-  chatApi: {},
+  chatApi,
   subscribeExecution: (sessionId: number, _executionId: number, handlers: ExecutionHandlers) => {
     const stop = vi.fn()
     subs.push({ sessionId, handlers, stop })
@@ -21,7 +23,8 @@ vi.mock('./answerNotifier', async (importOriginal) => ({
   notifyAnswer: vi.fn(),
 }))
 
-const { attachSession, resumeExecution, stopBackgroundStreams, useBackgroundRuns, useChatRun } = await import('./chatRunStore')
+const { attachSession, resumeExecution, sendQuestion, stopBackgroundStreams, useBackgroundRuns, useChatRun } = await import('./chatRunStore')
+const { coordsForNext, forgetCoords } = await import('./heldCoords')
 const { notifyAnswer } = await import('./answerNotifier')
 
 const done = (sessionId: number): ChatExecutionState => ({
@@ -85,5 +88,46 @@ describe('답변을 기다리던 대화를 떠났을 때', () => {
     attachSession(2)
     await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'CONNECTED_ELSEWHERE', message: '' })
     expect(notifyAnswer).not.toHaveBeenCalled()
+  })
+})
+
+describe('질문을 보내는 중(서버 응답 전)에 다른 대화로 옮겼을 때', () => {
+  const here = { latitude: 37.5, longitude: 127.0 }
+  const clarify = [{ role: 'ASSISTANT' as const, messageType: 'CLARIFICATION' as const, sequenceNo: 2 }]
+
+  beforeEach(() => {
+    attachSession(null)
+    stopBackgroundStreams()
+    forgetCoords()
+    subs.length = 0
+    vi.mocked(notifyAnswer).mockClear()
+  })
+
+  it('백그라운드에서 답변을 기다렸다가 알리고, 보낸 좌표는 그 대화에 남긴다', async () => {
+    let respond!: (v: unknown) => void
+    chatApi.sendMessage.mockReturnValueOnce(new Promise((r) => (respond = r)))
+    attachSession(1)
+    const sending = sendQuestion('근처 매장', undefined, here)
+    await Promise.resolve()
+    attachSession(2)
+    respond({ sessionId: 1, messageId: 5, executionId: 10, inputGuard: null })
+    await sending
+
+    expect(useBackgroundRuns.getState().ids).toEqual([1])
+    expect(useChatRun.getState()).toMatchObject({ sessionId: 2, status: 'idle' })
+    expect(coordsForNext(1, clarify)).toEqual(here)
+
+    await subs[0].handlers.onComplete(done(1))
+    expect(notifyAnswer).toHaveBeenCalledWith(1, 'answered')
+    expect(useBackgroundRuns.getState().ids).toEqual([])
+  })
+
+  it('답변을 기다리지 않는 대화를 떠나면 좌표를 버린다', async () => {
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: null, inputGuard: null })
+    attachSession(1)
+    await sendQuestion('근처 매장', undefined, here)
+    attachSession(2)
+    attachSession(1)
+    expect(coordsForNext(1, clarify)).toBeUndefined()
   })
 })

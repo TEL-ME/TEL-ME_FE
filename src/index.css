@@ -57,6 +57,12 @@
     opacity: 0;
   }
 }
+@keyframes tm-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
 @keyframes tm-rise {
   from {
     opacity: 0.4;
@@ -80,6 +86,9 @@
   .tm-rise {
     animation: tm-rise 0.25s ease-out;
   }
+  .tm-drop {
+    animation: tm-drop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
   .no-scrollbar {
     scrollbar-width: none;
   }
@@ -102,7 +111,8 @@
   .tm-dot,
   .tm-bob,
   .tm-pulse,
-  .tm-rise {
+  .tm-rise,
+  .tm-drop {
     animation: none;
   }
 }

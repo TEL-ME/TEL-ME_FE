@@ -6,7 +6,7 @@ import avatarImg from '../assets/mudo/mudo-avatar.png'
 import { startKakaoLink } from '../features/auth/accountLink'
 import { openLoginSheet } from '../features/auth/loginSheetStore'
 import { logout, useMe } from '../features/auth/useAuth'
-import { browserNotifyOn, setBrowserNotify, useAnswerNotify } from '../features/chat/answerNotifier'
+import { browserNotifyOn, browserNotifySupported, setBrowserNotify, useAnswerNotify } from '../features/chat/answerNotifier'
 import { useThemeStore, type ThemeSetting } from '../stores/themeStore'
 import { showToast } from '../stores/toastStore'
 import type { LoginMethod, Me } from '../api/types'
@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const theme = useThemeStore((s) => s.theme)
   const setTheme = useThemeStore((s) => s.setTheme)
   const notifyOn = browserNotifyOn(useAnswerNotify((s) => s.browserEnabled))
+  const canNotify = browserNotifySupported()
   const { me, isUser } = useMe()
   const navigate = useNavigate()
   const [confirmLogout, setConfirmLogout] = useState(false)
@@ -124,12 +125,17 @@ export default function SettingsPage() {
             type="button"
             role="switch"
             aria-checked={notifyOn}
+            disabled={!canNotify}
             onClick={() => void setBrowserNotify(!notifyOn)}
-            className="flex min-h-[56px] w-full items-center gap-3 px-1 py-2 text-left"
+            className="flex min-h-[56px] w-full items-center gap-3 px-1 py-2 text-left disabled:opacity-50"
           >
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-[15px] font-medium text-ink">답변 완료 알림</span>
-              <span className="text-xs leading-4 text-ink-sub">다른 탭을 보는 동안 답변이 오면 브라우저 알림으로 알려 드려요</span>
+              <span className="text-xs leading-4 text-ink-sub">
+                {canNotify
+                  ? '다른 탭을 보는 동안 답변이 오면 브라우저 알림으로 알려 드려요'
+                  : '이 브라우저에서는 알림을 띄울 수 없어요. 답변이 오면 탭 제목에 표시해 드려요'}
+              </span>
             </span>
             <span
               aria-hidden

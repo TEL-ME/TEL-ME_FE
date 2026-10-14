@@ -2,7 +2,11 @@ import { create } from 'zustand'
 import { chatApi, subscribeExecution, type ChatCoordinates } from '../../api/chat'
 import { ApiError } from '../../api/client'
 import { queryClient } from '../../lib/queryClient'
+import { showToast } from '../../stores/toastStore'
+import type { ChatMessageHistory } from '../../api/types'
 import { clearAllUnread, notifyAnswer, outcomeOfComplete, shouldNotifyFailure } from './answerNotifier'
+import { coordsForNext, forgetCoordsExcept, rememberCoords } from './heldCoords'
+import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
 
@@ -19,8 +23,13 @@ interface ChatRunState {
   /** 지금 화면이 보고 있는 대화. 메인(새 대화)이면 null */
   sessionId: number | null
   status: ChatStatus
-  /** 서버에 저장되기 전까지 보여 줄 내 질문 */
+  /**
+   * 서버에 저장되기 전의 내 질문 (원문). 화면에는 그리지 않고 대기 말풍선만 보여 준다.
+   * 서버가 민감정보를 가린 뒤 저장한 내용이 메시지 목록으로 오면 그것을 보여 준다 (TELME-119)
+   */
   pendingQuestion: string | null
+  /** 방금 보낸 질문이 서버에 저장된 메시지 번호. 목록에 이 번호가 보이면 대기 말풍선을 내린다 */
+  sentMessageId: number | null
   /** 타자 효과로 보여 줄 답변 메시지 */
   typingMessageId: number | null
   errorMessage: string | null
@@ -30,6 +39,7 @@ const initial: ChatRunState = {
   sessionId: null,
   status: 'idle',
   pendingQuestion: null,
+  sentMessageId: null,
   typingMessageId: null,
   errorMessage: null,
 }
@@ -54,6 +64,8 @@ export const useBackgroundRuns = create<{ ids: number[] }>(() => ({ ids: [] }))
 const syncBackground = () => useBackgroundRuns.setState({ ids: [...background.keys()] })
 /** 현재 위치와 함께 보낸 마지막 질문. "다시 시도"로 같은 질문을 다시 보낼 때만 위치를 다시 붙인다 */
 let lastLocated: { content: string; coords: ChatCoordinates } | null = null
+/** 질문을 보내는 중(서버 응답 전)인 대화 */
+let sendingSessionId: number | null = null
 let reconnectTries = 0
 const MAX_RECONNECT = 3
 
@@ -77,14 +89,18 @@ const refreshMessages = (sessionId: number) => {
 export function attachSession(sessionId: number | null) {
   const prev = get()
   if (prev.sessionId === sessionId) return
-  if (stopStream && prev.sessionId != null && prev.status === 'thinking') {
-    background.set(prev.sessionId, stopStream)
+  const toBackground = stopStream != null && prev.sessionId != null && prev.status === 'thinking'
+  if (toBackground) {
+    background.set(prev.sessionId!, stopStream!)
     stopStream = null
     syncBackground()
   } else {
     closeStream()
   }
   lastLocated = null
+  // 답변을 아직 기다리는 대화(백그라운드로 넘겼거나 보내는 중)의 좌표는 남긴다.
+  // 그 답변이 되묻기면 돌아와서 답할 때 다시 붙여야 한다
+  forgetCoordsExcept([...background.keys(), sendingSessionId])
   const resumed = sessionId != null ? background.get(sessionId) : undefined
   if (resumed) {
     background.delete(sessionId!)
@@ -118,11 +134,25 @@ function finishInBackground(sessionId: number, notify: () => void): boolean {
 function listen(sessionId: number, executionId: number) {
   closeStream()
   set({ status: 'thinking', errorMessage: null })
+  stopStream = subscribe(sessionId, executionId)
+}
 
-  stopStream = subscribeExecution(sessionId, executionId, {
+/**
+ * 질문을 보낸 뒤 서버 응답이 오기 전에 다른 대화로 옮겼을 때.
+ * 답변은 서버에서 계속 만들어지므로 처음부터 백그라운드로 구독해 두었다가 끝나면 알린다
+ */
+function listenInBackground(sessionId: number, executionId: number) {
+  background.get(sessionId)?.()
+  background.set(sessionId, subscribe(sessionId, executionId))
+  syncBackground()
+}
+
+/** 구독 하나. 끝났을 때 백그라운드로 넘어가 있으면 알리기만 하고, 보고 있는 대화면 화면 상태를 바꾼다 */
+function subscribe(sessionId: number, executionId: number) {
+  return subscribeExecution(sessionId, executionId, {
     onComplete: async (state) => {
       reconnectTries = 0
-      const notify = () => notifyAnswer(sessionId, outcomeOfComplete(state))
+      const notify = () => void notifyAnswer(sessionId, outcomeOfComplete(state))
       if (finishInBackground(sessionId, notify)) return
       stopStream = null
       if (get().sessionId !== sessionId) return
@@ -133,7 +163,9 @@ function listen(sessionId: number, executionId: number) {
     },
     onError: async (failure) => {
       reconnectTries = 0
-      const notify = () => shouldNotifyFailure(failure) && notifyAnswer(sessionId, 'failed')
+      const notify = () => {
+        if (shouldNotifyFailure(failure)) void notifyAnswer(sessionId, 'failed')
+      }
       if (finishInBackground(sessionId, notify)) return
       stopStream = null
       if (get().sessionId !== sessionId) return
@@ -180,6 +212,7 @@ export function resumeExecution(sessionId: number, executionId: number) {
 /**
  * 질문 보내기. 메인(새 대화)에서는 이때 세션을 만들고 onSessionCreated로 주소를 바꾼다 (문서 2. 채팅 세션 생성)
  * coords는 "현재 위치 사용"을 눌러 보낼 때만 준다.
+ * 위치를 보낸 뒤 되묻기에 답할 때는 그 좌표를 다시 붙인다 (서버가 좌표를 저장하지 않음, heldCoords)
  */
 export async function sendQuestion(
   question: string,
@@ -188,9 +221,9 @@ export async function sendQuestion(
 ) {
   const content = question.trim()
   if (!content || isBusy(get().status)) return
-  lastLocated = coords ? { content, coords } : null
 
-  set({ status: 'sending', pendingQuestion: content, typingMessageId: null, errorMessage: null })
+  clearInputGuardNotice()
+  set({ status: 'sending', pendingQuestion: content, sentMessageId: null, typingMessageId: null, errorMessage: null })
   let sessionId = get().sessionId
   try {
     if (sessionId == null) {
@@ -199,10 +232,33 @@ export async function sendQuestion(
       set({ sessionId })
       onSessionCreated?.(sessionId)
     }
-    const sent = await chatApi.sendMessage(sessionId, content, coords)
-    if (get().sessionId !== sessionId) return
+    sendingSessionId = sessionId
+    let sendCoords = coords
+    if (coords) rememberCoords(sessionId, coords)
+    else sendCoords = coordsForNext(sessionId, queryClient.getQueryData<ChatMessageHistory>(messagesKey(sessionId))?.messages)
+    lastLocated = sendCoords ? { content, coords: sendCoords } : null
+    const sent = await chatApi.sendMessage(sessionId, content, sendCoords).finally(() => {
+      sendingSessionId = null
+    })
+    if (get().sessionId !== sessionId) {
+      // 보내는 사이 다른 대화로 옮겼다. 사용 제한은 대화와 상관없이 걸리므로 반영하고, 답변은 백그라운드에서 기다린다
+      if (sent.inputGuard?.action === 'RESTRICTED') applyInputGuard(sent.inputGuard)
+      void refreshMessages(sessionId)
+      if (sent.executionId != null) listenInBackground(sessionId, sent.executionId)
+      return
+    }
+    set({ sentMessageId: sent.messageId ?? null })
+    // 입력 검사 (TELME-119): 가림(MASKED)은 그대로 진행, 경고·재입력·제한은 답변을 만들지 않는다
+    if (sent.inputGuard) {
+      applyInputGuard(sent.inputGuard)
+      if (sent.inputGuard.action === 'MASKED') showToast(sent.inputGuard.message)
+    }
     await refreshMessages(sessionId)
-    set({ pendingQuestion: null })
+    set({ pendingQuestion: null, sentMessageId: null })
+    if (sent.executionId == null) {
+      set({ status: 'idle' })
+      return
+    }
     listen(sessionId, sent.executionId)
   } catch (error) {
     if (get().sessionId !== sessionId) return
@@ -253,6 +309,7 @@ export async function retryAnswer(
     const sent = await chatApi.retryMessage(sessionId, failedMessageId)
     if (get().sessionId !== sessionId) return
     await refreshMessages(sessionId)
+    if (sent.executionId == null) return set({ status: 'idle' })
     listen(sessionId, sent.executionId)
   } catch (error) {
     if (get().sessionId !== sessionId) return

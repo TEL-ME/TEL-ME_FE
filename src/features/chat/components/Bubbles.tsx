@@ -1,11 +1,53 @@
 import type { ReactNode } from 'react'
 import avatarImg from '../../../assets/home/mudo-headset.png'
 
-export function UserBubble({ children }: { children: ReactNode }) {
+export function UserBubble({ children, blocked = false }: { children: ReactNode; blocked?: boolean }) {
+  if (blocked) {
+    // 입력 검사에 걸려 답변을 만들지 않은 질문 (가려진 내용으로 저장된다)
+    return (
+      <div className="tm-rise flex flex-col items-end gap-1">
+        <div className="max-w-[82%] whitespace-pre-line rounded-[22px] rounded-br-md border-[1.5px] border-dashed border-line bg-surface-2 px-4 py-3 text-[15px] leading-6 text-ink-sub">
+          {children}
+        </div>
+        <span className="mr-1 text-xs text-ink-muted">운영 정책에 따라 답변하지 않은 메시지예요</span>
+      </div>
+    )
+  }
   return (
     <div className="tm-rise flex justify-end">
       <div className="max-w-[82%] whitespace-pre-line rounded-[22px] rounded-br-md bg-brand px-4 py-3 text-[15px] leading-6 text-white">
         {children}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 서버가 입력을 검사해 저장하기 전까지 내 질문 자리에 두는 말풍선.
+ * 민감정보는 서버가 가린 뒤에만 보여야 해서, 입력한 원문은 그리지 않는다 (TELME-119).
+ * failed: 서버에 닿지 못해 검사 결과가 없는 경우
+ */
+export function PendingUserBubble({ failed = false }: { failed?: boolean }) {
+  return (
+    <div className="tm-rise flex justify-end">
+      <div
+        role="status"
+        className={`max-w-[82%] rounded-[22px] rounded-br-md px-4 py-3 text-[15px] leading-6 ${
+          failed ? 'border-[1.5px] border-dashed border-line bg-surface-2 text-ink-sub' : 'bg-brand text-white opacity-80'
+        }`}
+      >
+        {failed ? (
+          '보내지 못한 질문이에요'
+        ) : (
+          <span className="flex items-center gap-2">
+            질문을 확인하고 있어요
+            <span aria-hidden className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="tm-dot h-1.5 w-1.5 rounded-full bg-white" style={{ animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </span>
+          </span>
+        )}
       </div>
     </div>
   )

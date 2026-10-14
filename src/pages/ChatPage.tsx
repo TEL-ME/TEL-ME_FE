@@ -18,6 +18,8 @@ import {
 } from '../features/chat/chatRunStore'
 import ChatHeader from '../features/chat/components/ChatHeader'
 import Composer from '../features/chat/components/Composer'
+import InputGuardBanner from '../features/chat/components/InputGuardBanner'
+import { useRestrictionText } from '../features/chat/useRestrictionText'
 import HomeIntro from '../features/chat/components/HomeIntro'
 import MessageList from '../features/chat/components/MessageList'
 import SessionDrawer from '../features/chat/components/SessionDrawer'
@@ -34,7 +36,9 @@ import { sessionsKey, useSessions } from '../features/chat/sessionQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '../stores/toastStore'
 import { useChatScroll } from '../features/chat/useChatScroll'
-import { isLocationAsk } from '../features/chat/storeAsk'
+import { CHAT_GPS_ENABLED, hasChoices, isLocationAsk, wantsNearbyStore } from '../features/chat/storeAsk'
+import { locateErrorMessage, locateMe } from '../features/stores/locate'
+import { rememberMe } from '../features/stores/storeSearchStore'
 import { takeHandedQuestion } from '../features/chat/askHandoff'
 
 const MUDO_BY_STATUS: Record<ChatStatus, MudoStatus> = {
@@ -119,6 +123,24 @@ export default function ChatPage() {
     void sendQuestion(question, (id) => navigate(`/chat/${id}`), coords)
   }
 
+  // 입력창에 "현재 위치·근처·주변 + 매장"을 쓰면 위치 권한을 받아 좌표를 함께 보낸다.
+  // 위치를 못 받으면 좌표 없이 보낸다 (서버가 지역을 되묻는다)
+  const [locating, setLocating] = useState(false)
+  const askTyped = async (question: string) => {
+    if (!CHAT_GPS_ENABLED || !wantsNearbyStore(question)) return ask(question)
+    setLocating(true)
+    try {
+      const here = await locateMe()
+      rememberMe(here)
+      ask(question, { latitude: here.lat, longitude: here.lng })
+    } catch (error) {
+      showToast(locateErrorMessage(error, '위치 권한이 꺼져 있어서 지역을 여쭤볼게요'))
+      ask(question)
+    } finally {
+      setLocating(false)
+    }
+  }
+
   // 다른 화면에서 질문을 들고 온 경우 (예: 마이 → 무러바라에게 요금제 물어보기) 한 번만 보낸다
   const location = useLocation()
   const carried = (location.state as { ask?: string } | null)?.ask
@@ -168,11 +190,13 @@ export default function ChatPage() {
     invalidRoute || (messagesQuery.error instanceof ApiError && [400, 403, 404].includes(messagesQuery.error.status))
   const showThread = activeId != null && !notFound
   const lastAssistant = messages.filter((m) => m.role === 'ASSISTANT').at(-1)
-  // 되묻기 답변일 때 입력창 안내. 되묻는 내용 종류를 서버가 따로 주지 않아 질문 문장으로 고른다
+  // 되묻기 답변일 때 입력창 안내. 선택지가 있으면 고르게 하고, 없으면 질문 문장으로 고른다
   const placeholder =
     lastAssistant?.messageType !== 'CLARIFICATION'
       ? undefined
-      : isLocationAsk(lastAssistant)
+      : hasChoices(lastAssistant)
+        ? '위에서 고르거나 직접 입력해 주세요'
+        : isLocationAsk(lastAssistant)
         ? '예: 강남역 근처, 마포구'
         : '무러바라가 물어본 내용을 알려 주세요'
 
@@ -194,6 +218,9 @@ export default function ChatPage() {
       setConfirmEnd(false)
     }
   }
+
+  // 반복 욕설로 일시 제한 중이면 입력을 막는다 (TELME-119)
+  const restriction = useRestrictionText()
 
   const listProps = { currentId: activeId, busy, onPick: pickSession, onNewChat: newChat }
 
@@ -238,6 +265,7 @@ export default function ChatPage() {
               isUser={isUser}
               messages={messages}
                 pendingQuestion={own ? run.pendingQuestion : null}
+                sentMessageId={own ? run.sentMessageId : null}
                 status={status}
                 typingMessageId={own ? run.typingMessageId : null}
                 errorMessage={own ? run.errorMessage : null}
@@ -279,7 +307,17 @@ export default function ChatPage() {
               </button>
             </div>
           ) : (
-            !notFound && <Composer busy={busy} placeholder={placeholder} onSend={ask} />
+            !notFound && (
+              <>
+                <InputGuardBanner />
+                <Composer
+                  busy={busy || locating}
+                  placeholder={locating ? '현재 위치를 확인하고 있어요…' : placeholder}
+                  lockedText={restriction}
+                  onSend={(q) => void askTyped(q)}
+                />
+              </>
+            )
           )}
         </footer>
       </div>

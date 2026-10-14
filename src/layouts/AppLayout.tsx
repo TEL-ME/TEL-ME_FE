@@ -3,7 +3,8 @@ import { useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import Toast from '../components/Toast'
 import LoginSheet from '../features/auth/LoginSheet'
-import { clearUnread, useUnreadAnswers } from '../features/chat/answerNotifier'
+import { clearUnread, dismissBannersOf, useUnreadAnswers } from '../features/chat/answerNotifier'
+import AnswerBanners from '../features/chat/components/AnswerBanners'
 import { useBackgroundRuns, useChatRun } from '../features/chat/chatRunStore'
 import DislikeSheet from '../features/feedback/DislikeSheet'
 import { hasOnboarded } from '../features/onboarding/onboardingFlag'
@@ -47,7 +48,9 @@ function useChatBadge(pathname: string): ChatBadge {
 
   // 그 대화를 열면 도착 표시를 지운다
   useEffect(() => {
-    if (viewingId != null) clearUnread(viewingId)
+    if (viewingId == null) return
+    clearUnread(viewingId)
+    dismissBannersOf(viewingId)
   }, [viewingId, unread])
 
   if (unread.some((id) => id !== viewingId)) return 'arrived'
@@ -113,6 +116,7 @@ export default function AppLayout() {
       </nav>
       <DislikeSheet />
       <LoginSheet />
+      <AnswerBanners />
       <Toast />
     </div>
   )
