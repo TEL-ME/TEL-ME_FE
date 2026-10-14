@@ -1,4 +1,5 @@
-import { CircleCheck, RotateCw } from 'lucide-react'
+import { RotateCw } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { ChatCoordinates } from '../../../api/chat'
 import type { ChatMessage } from '../../../api/types'
 import FeedbackButtons from '../../feedback/FeedbackButtons'
@@ -29,10 +30,10 @@ interface MessageListProps {
   onAsk: (question: string, coords?: ChatCoordinates) => void
   /** 종료된 대화: 빠른 답 버튼을 보여 주지 않는다 */
   closed?: boolean
-  /** 상담 종료 (가장 최근 답변 오른쪽 아래 버튼). 종료된 대화면 undefined */
-  onEndConsult?: () => void
   /** failedMessageId가 null이면 질문이 서버에 저장되기 전에 실패한 경우 */
   onRetry: (question: string, failedMessageId: number | null) => void
+  /** 대화 맨 아래에 붙는 내용 (종료된 대화의 상담 요약) */
+  footer?: ReactNode
 }
 
 const FAIL_STATUSES = new Set(['FAILED', 'TIMEOUT', 'CANCELLED'])
@@ -66,8 +67,8 @@ export default function MessageList({
   onTyped,
   onAsk,
   onRetry,
-  onEndConsult,
   closed = false,
+  footer,
 }: MessageListProps) {
   const busy = isBusy(status)
   const sorted = foldRetried(
@@ -142,24 +143,8 @@ export default function MessageList({
             tone={tone}
             meta={meta}
             actions={
-              showExtras && (canRate(m) || (m.messageId === lastAnswerId && onEndConsult)) ? (
-                <>
-                  {canRate(m) && sessionId != null && (
-                    <FeedbackButtons sessionId={sessionId} messageId={m.messageId} myFeedback={m.myFeedback} isUser={isUser} />
-                  )}
-                  {/* 가장 최근 답변에만: 말풍선 오른쪽 끝에 맞춘 상담 종료 (눈에 덜 띄게) */}
-                  {m.messageId === lastAnswerId && onEndConsult && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={onEndConsult}
-                      className="ml-auto mr-2 flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-medium text-ink-muted opacity-80 hover:bg-surface hover:opacity-100 disabled:opacity-40"
-                    >
-                      <CircleCheck size={14} strokeWidth={2} aria-hidden />
-                      상담 종료
-                    </button>
-                  )}
-                </>
+              showExtras && canRate(m) && sessionId != null ? (
+                <FeedbackButtons sessionId={sessionId} messageId={m.messageId} myFeedback={m.myFeedback} isUser={isUser} />
               ) : undefined
             }
             after={
@@ -197,6 +182,8 @@ export default function MessageList({
           {retryButton(pendingQuestion, null)}
         </BotBubble>
       )}
+
+      {footer}
     </div>
   )
 }
