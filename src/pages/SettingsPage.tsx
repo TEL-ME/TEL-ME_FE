@@ -133,7 +133,7 @@ export default function SettingsPage() {
               <span className="text-[15px] font-medium text-ink">답변 완료 알림</span>
               <span className="text-xs leading-4 text-ink-sub">
                 {canNotify
-                  ? '다른 탭을 보는 동안 답변이 오면 브라우저 알림으로 알려 드려요'
+                  ? '다른 탭이나 앱을 쓰는 동안 답변이 오면 시스템 알림으로 알려 드려요'
                   : '이 브라우저에서는 알림을 띄울 수 없어요. 답변이 오면 탭 제목에 표시해 드려요'}
               </span>
             </span>

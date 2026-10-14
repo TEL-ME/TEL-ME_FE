@@ -11,7 +11,7 @@ import { sessionsKey } from './sessionQueries'
  * 답변 완료 알림. 기다리는 대화가 여럿일 수 있어 어느 대화의 답변인지(대화 제목)를 함께 보여 준다
  * - 그 대화를 보고 있으면: 알리지 않는다 (답변이 바로 보인다)
  * - 앱 안의 다른 화면(매장·설정·다른 대화)이면: 화면 위에서 내려오는 알림 (대화 제목 + 결과)
- * - 탭이 뒤에 있으면: 브라우저 알림(설정에서 켰을 때) + 탭 제목에 도착 수 표시
+ * - 탭이 뒤에 있거나 다른 앱을 쓰는 중이면: 시스템 알림(설정에서 켰을 때) + 탭 제목에 도착 수 표시
  */
 export type AnswerOutcome = 'answered' | 'clarify' | 'failed'
 
@@ -65,6 +65,9 @@ export const shouldNotifyFailure = (failure: ChatFailure) => failure.errorCode !
 
 const chatPath = (sessionId: number) => `/chat/${sessionId}`
 
+/** 시스템 알림에 붙이는 대표 로고 (public/icon-192.png) */
+const NOTIFICATION_ICON = '/icon-192.png'
+
 /** 답변이 왔지만 아직 열어 보지 않은 대화. 하단 메뉴 "상담"에 점으로 표시한다 */
 export const useUnreadAnswers = create<{ ids: number[] }>(() => ({ ids: [] }))
 
@@ -88,17 +91,26 @@ export function clearAllUnread() {
 const openChat = (sessionId: number) =>
   void import('../../app/router').then(({ router }) => router.navigate(chatPath(sessionId)))
 
+/**
+ * 사용자가 이 화면을 보고 있지 않은지: 탭이 뒤에 있거나, 창은 떠 있지만 다른 앱·창을 쓰는 중.
+ * 맥에서 다른 앱으로 옮기면 브라우저 창이 화면에 남아 있어 visibilityState는 visible 그대로라 포커스도 함께 본다
+ */
+const isAway = () => document.visibilityState === 'hidden' || !document.hasFocus()
+
 let unread = 0
 let baseTitle: string | null = null
 
 function markTitle() {
   if (baseTitle == null) {
     baseTitle = document.title
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible' || baseTitle == null) return
+    // 탭으로 돌아오거나 창을 다시 쓰기 시작하면 원래 제목으로 되돌린다
+    const restore = () => {
+      if (isAway() || baseTitle == null) return
       unread = 0
       document.title = baseTitle
-    })
+    }
+    document.addEventListener('visibilitychange', restore)
+    window.addEventListener('focus', restore)
   }
   unread += 1
   document.title = `(${unread}) ${baseTitle}`
@@ -189,20 +201,21 @@ export async function notifyAnswer(sessionId: number, outcome: AnswerOutcome) {
   const viewing = () => window.location.pathname === chatPath(sessionId)
   // 그 대화를 보고 있으면 탭이 뒤에 있어도 돌아왔을 때 바로 보이므로 표시하지 않는다
   if (!viewing()) markUnread(sessionId)
-  const hidden = document.visibilityState === 'hidden'
-  if (hidden) markTitle()
+  const away = isAway()
+  if (away) markTitle()
   else if (viewing()) return
 
   const title = await sessionTitleFor(sessionId)
 
-  if (hidden) {
-    if (!browserNotifyOn(useAnswerNotify.getState().browserEnabled)) return
+  if (away && browserNotifyOn(useAnswerNotify.getState().browserEnabled)) {
     try {
       // 같은 대화의 알림은 하나만 남기되, 바꿔 넣을 때도 다시 띄운다 (renotify가 없으면 크롬이 조용히 교체한다)
       const n = new Notification(title, {
         body: `${OUTCOME_TEXT[outcome]} · TEL-ME`,
         tag: `telme-chat-${sessionId}`,
         renotify: true,
+        // 대표 로고. 맥 크롬은 알림 오른쪽에 작게 보여 준다
+        icon: NOTIFICATION_ICON,
       } as NotificationOptions)
       n.onclick = () => {
         window.focus()
@@ -212,10 +225,9 @@ export async function notifyAnswer(sessionId: number, outcome: AnswerOutcome) {
     } catch {
       // 모바일 크롬처럼 페이지에서 바로 띄우는 알림을 막는 브라우저는 탭 제목 표시만 남긴다
     }
-    return
   }
 
-  // 제목을 읽는 사이 그 대화를 열었으면 띄우지 않는다
-  if (viewing()) return
+  // 화면 위 알림은 탭이 보일 때만. 제목을 읽는 사이 그 대화를 열었으면 띄우지 않는다
+  if (document.visibilityState === 'hidden' || viewing()) return
   pushBanner(sessionId, title, outcome)
 }

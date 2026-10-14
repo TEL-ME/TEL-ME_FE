@@ -54,6 +54,7 @@ describe('notifyAnswer', () => {
     listSessions.mockResolvedValue(sessionsPage({ 1: '요금제 변경 문의', 2: '유심 재발급', 3: null }))
     getMessages.mockResolvedValue({ messages: [], runningExecutionId: null })
     window.history.replaceState(null, '', '/')
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
   })
 
   afterEach(() => {
@@ -121,7 +122,7 @@ describe('notifyAnswer', () => {
 
     useAnswerNotify.setState({ browserEnabled: true })
     await notifyAnswer(2, 'failed')
-    expect(NotificationMock).toHaveBeenCalledWith('유심 재발급', { body: '답변을 만들지 못했어요 · TEL-ME', tag: 'telme-chat-2', renotify: true })
+    expect(NotificationMock).toHaveBeenCalledWith('유심 재발급', { body: '답변을 만들지 못했어요 · TEL-ME', tag: 'telme-chat-2', renotify: true, icon: '/icon-192.png' })
     expect(document.title).toBe(`(2) ${title}`)
 
     setVisibility('visible')
@@ -141,6 +142,37 @@ describe('notifyAnswer', () => {
     expect(NotificationMock).not.toHaveBeenCalled()
     expect(document.title).toBe('(1) TEL-ME')
     ua.mockRestore()
+  })
+})
+
+describe('창은 보이지만 다른 앱을 쓰는 중일 때 (맥에서 다른 앱으로 옮긴 경우)', () => {
+  const NotificationMock = vi.fn()
+  beforeEach(() => {
+    vi.stubGlobal('Notification', Object.assign(NotificationMock, { permission: 'granted' }))
+    useAnswerNotify.setState({ browserEnabled: true })
+    useAnswerBanners.setState({ items: [] })
+    listSessions.mockResolvedValue(sessionsPage({ 1: '요금제 변경 문의' }))
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+  })
+  afterEach(() => {
+    NotificationMock.mockReset()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    useAnswerNotify.setState({ browserEnabled: false })
+  })
+
+  it('보고 있던 대화의 답변이어도 시스템 알림을 띄운다', async () => {
+    window.history.replaceState(null, '', '/chat/1')
+    await notifyAnswer(1, 'answered')
+    expect(NotificationMock).toHaveBeenCalledWith('요금제 변경 문의', expect.objectContaining({ body: '답변 완료 · TEL-ME' }))
+    expect(useAnswerBanners.getState().items).toEqual([])
+  })
+
+  it('다른 화면에 있었으면 시스템 알림과 화면 위 알림을 함께 띄운다', async () => {
+    window.history.replaceState(null, '', '/stores')
+    await notifyAnswer(1, 'answered')
+    expect(NotificationMock).toHaveBeenCalledTimes(1)
+    expect(useAnswerBanners.getState().items.map((b) => b.sessionId)).toEqual([1])
   })
 })
 
