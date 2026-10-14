@@ -1,4 +1,4 @@
-import { ChevronUp } from 'lucide-react'
+import { ChevronUp, CircleCheck } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { chatApi, type ChatCoordinates } from '../api/chat'
@@ -36,6 +36,8 @@ import { sessionsKey, useSessions } from '../features/chat/sessionQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '../stores/toastStore'
 import { useChatScroll } from '../features/chat/useChatScroll'
+import EndSummaryCard from '../features/chat/components/EndSummaryCard'
+import { endSummaryKey } from '../features/chat/endSummaryQueries'
 import { CHAT_GPS_ENABLED, hasChoices, isLocationAsk, wantsNearbyStore } from '../features/chat/storeAsk'
 import { locateErrorMessage, locateMe } from '../features/stores/locate'
 import { rememberMe } from '../features/stores/storeSearchStore'
@@ -209,8 +211,11 @@ export default function ChatPage() {
     setEnding(true)
     try {
       await chatApi.closeSession(activeId)
+      // 종료 응답이 요약 완료를 뜻하지는 않는다. 요약 카드가 상태를 다시 읽으며 기다린다
+      void queryClient.invalidateQueries({ queryKey: endSummaryKey(activeId) })
       await queryClient.invalidateQueries({ queryKey: sessionsKey })
-      showToast('상담을 종료했어요. 기록은 대화 목록에서 다시 볼 수 있어요')
+      toBottom()
+      showToast('상담을 종료했어요.\n기록과 요약은 대화 목록에서 다시 볼 수 있어요', 3000)
     } catch (e) {
       showToast(e instanceof ApiError ? e.message : '상담을 종료하지 못했어요')
     } finally {
@@ -218,6 +223,10 @@ export default function ChatPage() {
       setConfirmEnd(false)
     }
   }
+
+  // 상담 종료 버튼: 답변을 하나라도 받은 진행 중 대화에서만
+  const canEnd =
+    showThread && !closed && messages.some((m) => m.role === 'ASSISTANT' && m.status === 'COMPLETED')
 
   // 반복 욕설로 일시 제한 중이면 입력을 막는다 (TELME-119)
   const restriction = useRestrictionText()
@@ -272,8 +281,8 @@ export default function ChatPage() {
                 onTyped={finishTyping}
                 onAsk={ask}
                 onRetry={retry}
-              onEndConsult={closed || ending ? undefined : () => setConfirmEnd(true)}
                 closed={closed}
+                footer={closed && activeId != null ? <EndSummaryCard sessionId={activeId} /> : undefined}
               />
               </>
             ) : (
@@ -283,6 +292,20 @@ export default function ChatPage() {
         </main>
 
         <footer className="relative flex shrink-0 flex-col gap-2 bg-bg px-4 py-2.5">
+          {canEnd && (
+            // 입력창 바로 위 가운데에 고정. 답변을 하나라도 받은 진행 중 대화에서만 보인다
+            <div className="pointer-events-none absolute bottom-full left-0 right-0 z-[4] mb-1 flex justify-center">
+              <button
+                type="button"
+                disabled={busy || ending}
+                onClick={() => setConfirmEnd(true)}
+                className="pointer-events-auto flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold text-ink-sub shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-50"
+              >
+                <CircleCheck size={15} strokeWidth={2} aria-hidden />
+                상담 종료
+              </button>
+            </div>
+          )}
           {showThread && (
             // 위치는 바깥 div가 잡는다 (CharacterStage.css의 position: relative와 겹치지 않게)
             <div

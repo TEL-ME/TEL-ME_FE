@@ -1,6 +1,8 @@
 import { hideToast, useToastStore } from '../stores/toastStore'
 
 const PILL = 'tm-rise flex items-center gap-3 rounded-full bg-inverse px-4 py-2.5 text-sm text-inverse-ink'
+/** 두 줄 이상(\n)이면 가운데 정렬한 둥근 상자로 */
+const MULTI = 'tm-rise rounded-[20px] bg-inverse px-5 py-3 text-center text-sm leading-[21px] text-inverse-ink whitespace-pre-line'
 
 export default function Toast() {
   const message = useToastStore((s) => s.message)
@@ -22,7 +24,7 @@ export default function Toast() {
             <span className="font-bold underline underline-offset-[3px]">{action.label}</span>
           </button>
         ) : (
-          <div role="status" className={PILL}>
+          <div role="status" className={message.includes('\n') ? MULTI : PILL}>
             {message}
           </div>
         ))}
