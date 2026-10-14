@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { authApi } from '../../api/auth'
 import type { Me } from '../../api/types'
 import { queryClient } from '../../lib/queryClient'
-import { attachSession } from '../chat/chatRunStore'
+import { attachSession, stopBackgroundStreams } from '../chat/chatRunStore'
 import { liftRestriction } from '../chat/inputGuardStore'
 
 export const meKey = ['auth', 'me'] as const
@@ -28,6 +28,7 @@ export async function logout() {
   } finally {
     // 로그아웃하면 이 기기에서는 새 게스트로 시작한다
     attachSession(null)
+    stopBackgroundStreams()
     liftRestriction()
     queryClient.removeQueries({ queryKey: ['chat'] })
     queryClient.setQueryData(meKey, GUEST)

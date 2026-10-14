@@ -18,6 +18,11 @@ export function forgetCoords() {
   held = null
 }
 
+/** 대화를 옮길 때: 아직 답변을 기다리는 대화(keep)의 좌표만 남기고 버린다 */
+export function forgetCoordsExcept(keep: readonly (number | null)[]) {
+  if (held && !keep.includes(held.sessionId)) held = null
+}
+
 /** 다음 전송에 붙일 좌표. 붙일 때가 아니면 들고 있던 좌표를 버리고 undefined */
 export function coordsForNext(
   sessionId: number,
