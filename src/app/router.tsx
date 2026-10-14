@@ -14,6 +14,8 @@ import ChatPage from '../pages/ChatPage'
 import EmailLoginPage from '../pages/EmailLoginPage'
 import IntroPage from '../pages/IntroPage'
 import MyPage from '../pages/MyPage'
+import MyPlanPage from '../pages/MyPlanPage'
+import PlanSelectPage from '../pages/PlanSelectPage'
 import OnboardingPage from '../pages/OnboardingPage'
 import OAuthCallbackPage from '../pages/OAuthCallbackPage'
 import Placeholder from '../pages/Placeholder'
@@ -35,6 +37,9 @@ export const router = createBrowserRouter([
       { path: '/stores/region', element: <StoreRegionPage /> },
       { path: '/stores/:storeId', element: <StoreDetailPage /> },
       { path: '/my', element: <MyPage /> },
+      // 요금제: 내 요금제(약정·정지·해지) · 가입/변경할 요금제 고르기 (로그인 회원만)
+      { path: '/my/plan', element: <MyPlanPage /> },
+      { path: '/my/plan/select', element: <PlanSelectPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/terms', element: <Placeholder title="이용약관" note="내용 준비 중" /> },
       { path: '/privacy', element: <Placeholder title="개인정보처리방침" note="내용 준비 중" /> },
