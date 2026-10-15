@@ -20,6 +20,7 @@ import OAuthCallbackPage from '../pages/OAuthCallbackPage'
 import Placeholder from '../pages/Placeholder'
 import SettingsPage from '../pages/SettingsPage'
 import SignupPage from '../pages/SignupPage'
+import SocialMatchPage from '../pages/SocialMatchPage'
 import StoreDetailPage from '../pages/StoreDetailPage'
 import StoreRegionPage from '../pages/StoreRegionPage'
 import StoresPage from '../pages/StoresPage'
@@ -48,6 +49,8 @@ export const router = createBrowserRouter([
   { path: '/auth/signup', element: <SignupPage /> },
   { path: '/settings/email-login', element: <AddEmailLoginPage /> },
   { path: '/oauth/callback', element: <OAuthCallbackPage /> },
+  // 소셜 로그인 중 같은 이메일 계정이 있을 때 (MEMBER409-1)
+  { path: '/auth/social-match', element: <SocialMatchPage /> },
   { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/intro', element: <IntroPage /> },
   // 관리자 (전용 로그인 페이지)

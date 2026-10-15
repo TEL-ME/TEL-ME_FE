@@ -1,7 +1,8 @@
-import { CircleAlert, Mail, MessageCircle, X } from 'lucide-react'
+import { CircleAlert, Mail, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { closeLoginSheet, useLoginSheet } from './loginSheetStore'
+import { SocialIcon } from './SocialIcon'
 import { SOCIAL_PROVIDERS, startSocialLogin } from './socialProviders'
 
 /** 간편 로그인 바텀시트 (Auth-2) */
@@ -66,14 +67,14 @@ export default function LoginSheet() {
         )}
 
         <div className="flex flex-col gap-2">
-          {SOCIAL_PROVIDERS.filter((p) => p.enabled).map((p) => (
+          {SOCIAL_PROVIDERS.map((p) => (
             <button
-              key={p.id}
+              key={p.code}
               type="button"
               onClick={() => startSocialLogin(p)}
               className={`flex min-h-[52px] items-center justify-center gap-2.5 rounded-2xl text-base font-bold ${p.className}`}
             >
-              {p.id === 'kakao' && <MessageCircle size={20} fill="currentColor" strokeWidth={0} aria-hidden />}
+              <SocialIcon code={p.code} />
               {p.label}
             </button>
           ))}

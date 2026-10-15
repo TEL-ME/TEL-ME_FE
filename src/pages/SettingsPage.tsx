@@ -1,15 +1,17 @@
-import { ChevronRight, Link2, Mail } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Check, ChevronRight, Info, Link2, Mail } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import avatarImg from '../assets/mudo/mudo-avatar.png'
-import { startKakaoLink } from '../features/auth/accountLink'
+import { startSocialLink, type LinkFailure } from '../features/auth/accountLink'
+import { SocialIcon } from '../features/auth/SocialIcon'
+import { PROVIDER_NAME } from '../features/auth/socialProviders'
 import { openLoginSheet } from '../features/auth/loginSheetStore'
 import { logout, useMe } from '../features/auth/useAuth'
 import { browserNotifyOn, browserNotifySupported, setBrowserNotify, useAnswerNotify } from '../features/chat/answerNotifier'
 import { useThemeStore, type ThemeSetting } from '../stores/themeStore'
 import { showToast } from '../stores/toastStore'
-import type { LoginMethod, Me } from '../api/types'
+import type { LoginMethod, Me, SocialProviderCode } from '../api/types'
 
 const APP_VERSION = '1.0.0'
 
@@ -36,6 +38,15 @@ export default function SettingsPage() {
   const { me, isUser } = useMe()
   const navigate = useNavigate()
   const [confirmLogout, setConfirmLogout] = useState(false)
+  // 연결하기에서 실패하고 돌아오면 콜백 화면이 이유를 넘겨준다 (새로고침하면 다시 뜨지 않게 바로 지운다)
+  const location = useLocation()
+  const [linkFail, setLinkFail] = useState<LinkFailure | null>(
+    () => (location.state as { linkFailure?: LinkFailure } | null)?.linkFailure ?? null,
+  )
+  const hasFailState = Boolean((location.state as { linkFailure?: LinkFailure } | null)?.linkFailure)
+  useEffect(() => {
+    if (hasFailState) navigate(location.pathname, { replace: true, state: null })
+  }, [hasFailState, navigate, location.pathname])
 
   const doLogout = async () => {
     setConfirmLogout(false)
@@ -55,7 +66,7 @@ export default function SettingsPage() {
             </div>
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <strong className="truncate text-base">
-                {isUser ? (me.name ? `${me.name} 님` : (me.email ?? '카카오 계정')) : '게스트로 이용 중'}
+                {isUser ? (me.name ? `${me.name} 님` : (me.email ?? '소셜 계정')) : '게스트로 이용 중'}
               </strong>
               <span className="text-xs leading-4 text-ink-sub">
                 {isUser ? accountSub(me) : '로그인하면 상담 기록이 내 계정에 저장돼요'}
@@ -73,30 +84,38 @@ export default function SettingsPage() {
               <ChevronRight size={18} strokeWidth={2} aria-hidden className="text-ink-muted" />
             </button>
           )}
-          {/* 로그인 수단 추가: 없는 쪽만 보인다 */}
-          {isUser && !me.loginMethods.includes('KAKAO') && (
-            <button
-              type="button"
-              onClick={startKakaoLink}
-              className="flex min-h-[56px] w-full items-center gap-3 px-1 text-left text-[15px] font-bold text-brand-strong"
-            >
-              <Link2 size={18} strokeWidth={2} aria-hidden />
-              <span className="flex-1">카카오 연결하기</span>
-              <ChevronRight size={18} strokeWidth={2} aria-hidden className="text-ink-muted" />
-            </button>
-          )}
-          {isUser && !me.loginMethods.includes('EMAIL') && (
-            <button
-              type="button"
-              onClick={() => navigate('/settings/email-login')}
-              className="flex min-h-[56px] w-full items-center gap-3 px-1 text-left text-[15px] font-bold text-brand-strong"
-            >
-              <Mail size={18} strokeWidth={2} aria-hidden />
-              <span className="flex-1">이메일 로그인 추가</span>
-              <ChevronRight size={18} strokeWidth={2} aria-hidden className="text-ink-muted" />
-            </button>
-          )}
         </Section>
+
+        {isUser && (
+          <section className="flex flex-col gap-2">
+            <h2 className="px-1 text-[13px] font-bold text-ink-sub">로그인 수단</h2>
+            <div className="rounded-card bg-surface px-3 py-1">
+              {(['KAKAO', 'GOOGLE'] as const).map((code) => (
+                <SocialMethodRow key={code} code={code} linked={me.loginMethods.includes(code)} />
+              ))}
+              <MethodRow
+                icon={
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-strong">
+                    <Mail size={20} strokeWidth={1.8} aria-hidden />
+                  </span>
+                }
+                name="이메일·비밀번호"
+                sub={me.loginMethods.includes('EMAIL') ? (me.email ?? '연결됨') : '추가하면 이메일로도 로그인할 수 있어요'}
+                action={
+                  me.loginMethods.includes('EMAIL') ? (
+                    <LinkedMark />
+                  ) : (
+                    <ActionButton onClick={() => navigate('/settings/email-login')}>추가하기</ActionButton>
+                  )
+                }
+              />
+            </div>
+            <p className="flex gap-1.5 px-1 text-[13px] leading-[19px] text-ink-sub">
+              <Info size={16} strokeWidth={2} aria-hidden className="mt-px shrink-0" />
+              카카오와 Google을 모두 연결할 수 있어요. 이미 다른 TEL-ME 계정에서 쓰는 소셜 계정은 연결할 수 없어요.
+            </p>
+          </section>
+        )}
 
         <Section title="화면">
           <div className="flex min-h-[56px] items-center gap-3 px-1">
@@ -192,11 +211,77 @@ export default function SettingsPage() {
       >
         로그아웃하면 이 기기에서는 새 게스트로 시작돼요. 지금 계정의 상담 기록은 다시 로그인하면 볼 수 있어요.
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={linkFail != null}
+        title={linkFail?.title ?? ''}
+        confirmLabel="확인"
+        cancelLabel={null}
+        onConfirm={() => setLinkFail(null)}
+        onCancel={() => setLinkFail(null)}
+      >
+        {linkFail?.message}
+      </ConfirmDialog>
     </main>
   )
 }
 
-const METHOD_LABEL: Record<LoginMethod, string> = { EMAIL: '이메일', KAKAO: '카카오' }
+const METHOD_LABEL: Record<LoginMethod, string> = { EMAIL: '이메일', KAKAO: '카카오', GOOGLE: 'Google' }
+
+/** 로그인 수단 한 줄: 아이콘 · 이름 · 설명 · 오른쪽 상태 */
+function MethodRow({ icon, name, sub, action }: { icon: ReactNode; name: string; sub: string; action: ReactNode }) {
+  return (
+    <div className="flex min-h-[72px] items-center gap-3 border-t border-surface-2 px-1 py-2.5 first:border-t-0">
+      {icon}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-base font-bold leading-[22px]">{name}</span>
+        <span className="truncate text-[13px] leading-[18px] text-ink-sub">{sub}</span>
+      </span>
+      {action}
+    </div>
+  )
+}
+
+function LinkedMark() {
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-sm font-bold text-success">
+      <Check size={16} strokeWidth={2.6} aria-hidden />
+      연결됨
+    </span>
+  )
+}
+
+function ActionButton({ onClick, children }: { onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-h-10 shrink-0 rounded-xl bg-brand-soft px-3.5 text-sm font-bold text-brand-strong"
+    >
+      {children}
+    </button>
+  )
+}
+
+function SocialMethodRow({ code, linked }: { code: SocialProviderCode; linked: boolean }) {
+  const name = PROVIDER_NAME[code]
+  return (
+    <MethodRow
+      icon={
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+            code === 'KAKAO' ? 'bg-[#fee500] text-[#191600]' : 'border-[1.5px] border-line bg-white'
+          }`}
+        >
+          <SocialIcon code={code} />
+        </span>
+      }
+      name={name}
+      sub={linked ? '연결됨' : `연결하면 ${name}로도 로그인할 수 있어요`}
+      action={linked ? <LinkedMark /> : <ActionButton onClick={() => startSocialLink(code)}>연결하기</ActionButton>}
+    />
+  )
+}
 
 /** 계정 줄 아래 글: 이메일(이름이 위에 있을 때) · 로그인 수단 */
 function accountSub(me: Me) {

@@ -5,7 +5,8 @@ interface ConfirmDialogProps {
   title: string
   children?: ReactNode
   confirmLabel: string
-  cancelLabel?: string
+  /** null이면 확인 버튼 하나만 둔다 (안내창). 닫기·Esc는 onCancel */
+  cancelLabel?: string | null
   onConfirm: () => void
   onCancel: () => void
 }
@@ -21,10 +22,11 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const titleId = useId()
   const cancelRef = useRef<HTMLButtonElement>(null)
+  const confirmRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
-    cancelRef.current?.focus()
+    ;(cancelRef.current ?? confirmRef.current)?.focus()
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -45,15 +47,18 @@ export default function ConfirmDialog({
         </h2>
         {children && <div className="text-[15px] leading-[23px] text-ink-sub">{children}</div>}
         <div className="mt-2.5 flex gap-2">
+          {cancelLabel !== null && (
+            <button
+              ref={cancelRef}
+              type="button"
+              onClick={onCancel}
+              className="min-h-[52px] flex-1 rounded-2xl bg-surface-2 text-base font-bold text-ink"
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
-            ref={cancelRef}
-            type="button"
-            onClick={onCancel}
-            className="min-h-[52px] flex-1 rounded-2xl bg-surface-2 text-base font-bold text-ink"
-          >
-            {cancelLabel}
-          </button>
-          <button
+            ref={confirmRef}
             type="button"
             onClick={onConfirm}
             className="min-h-[52px] flex-1 rounded-2xl bg-inverse text-base font-bold text-inverse-ink"

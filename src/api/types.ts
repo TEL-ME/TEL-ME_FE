@@ -201,14 +201,16 @@ export interface LoginResponse {
   email: string
 }
 
-export type LoginMethod = 'EMAIL' | 'KAKAO'
+/** 소셜 로그인 제공자 (sessionStorage에도 이 코드로 적는다) */
+export type SocialProviderCode = 'KAKAO' | 'GOOGLE'
+export type LoginMethod = 'EMAIL' | SocialProviderCode
 
 /** GET /api/v1/auth/me — 로그인 안 했으면 200 + role GUEST */
 export interface Me {
   authenticated: boolean
   userId: number | null
   email: string | null
-  /** 이메일 가입 때 받은 이름, 카카오는 닉네임 */
+  /** 이메일 가입 때 받은 이름, 소셜은 닉네임 */
   name: string | null
   role: 'GUEST' | 'USER' | 'ADMIN'
   loginMethods: LoginMethod[]

@@ -1,7 +1,8 @@
-import { Mail, MessageCircle } from 'lucide-react'
+import { Mail } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { setLoginReturn } from '../features/auth/loginSheetStore'
+import { SocialIcon } from '../features/auth/SocialIcon'
 import { SOCIAL_PROVIDERS, startSocialLogin } from '../features/auth/socialProviders'
 import { useMe } from '../features/auth/useAuth'
 import { markOnboarded } from '../features/onboarding/onboardingFlag'
@@ -80,9 +81,9 @@ export default function OnboardingPage() {
           </div>
         ) : last ? (
           <div className="flex flex-col gap-2">
-            {SOCIAL_PROVIDERS.filter((p) => p.enabled).map((p) => (
+            {SOCIAL_PROVIDERS.map((p) => (
               <button
-                key={p.id}
+                key={p.code}
                 type="button"
                 onClick={() => {
                   markOnboarded()
@@ -91,8 +92,8 @@ export default function OnboardingPage() {
                 }}
                 className={`flex min-h-[52px] items-center justify-center gap-2 rounded-2xl text-base font-bold ${p.className}`}
               >
-                {p.id === 'kakao' && <MessageCircle size={18} fill="currentColor" strokeWidth={0} aria-hidden />}
-                {p.id === 'kakao' ? '카카오로 로그인' : p.label}
+                <SocialIcon code={p.code} size={18} />
+                {p.shortLabel}
               </button>
             ))}
             <button

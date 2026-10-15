@@ -10,7 +10,7 @@ import { addEmailLoginSchema, type AddEmailLoginForm } from '../features/auth/sc
 import { afterLogin, useMe } from '../features/auth/useAuth'
 import { showToast } from '../stores/toastStore'
 
-/** 설정 › 이메일 로그인 추가 (카카오로만 가입한 회원) */
+/** 설정 › 이메일 로그인 추가 (소셜로만 가입한 회원) */
 export default function AddEmailLoginPage() {
   const navigate = useNavigate()
   const { me, isUser, isLoading } = useMe()
@@ -37,7 +37,7 @@ export default function AddEmailLoginPage() {
       showToast('이메일 로그인을 추가했어요. 이제 이메일로도 로그인할 수 있어요')
       navigate('/settings', { replace: true })
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'MEMBER409-0') setError('email', { message: '이미 다른 계정에서 쓰고 있는 이메일이에요' })
+      if (e instanceof ApiError && e.code === 'MEMBER409-0') setError('email', { message: '이미 다른 TEL-ME 계정에서 쓰는 이메일이라 추가할 수 없어요' })
       else if (e instanceof ApiError && e.code === 'MEMBER409-3') {
         await afterLogin()
         showToast('이미 이메일 로그인이 등록되어 있어요')
@@ -49,7 +49,7 @@ export default function AddEmailLoginPage() {
   return (
     <AuthScreen
       title="이메일 로그인 추가"
-      subtitle="카카오 말고 이메일과 비밀번호로도 로그인할 수 있게 해요"
+      subtitle="소셜 로그인 말고 이메일과 비밀번호로도 로그인할 수 있게 해요"
       footer={
         <>
           {errors.root && (
