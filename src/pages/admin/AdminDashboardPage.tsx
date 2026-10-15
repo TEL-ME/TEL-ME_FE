@@ -4,12 +4,8 @@ import { Link } from 'react-router-dom'
 import { adminDashboardApi, adminFeedbackApi, adminUnansweredApi, mainQuestion, type DashboardDay } from '../../api/admin'
 import { Badge, Card, Empty, PageHeader, secondaryBtn } from '../../features/admin/components/AdminUi'
 import { daysAgoIso, formatAdminTime } from '../../lib/date'
+import { dislikeReasonLabel } from '../../features/feedback/reasons'
 
-const REASON: Record<string, string> = {
-  WRONG_INFO: '정보가 정확하지 않아요',
-  NOT_RELATED: '질문과 관련이 없어요',
-  HARD_TO_READ: '이해하기 어려워요',
-}
 const TYPE: Record<string, [string, 'brand' | 'notice' | 'danger']> = {
   NO_EVIDENCE: ['근거 없음', 'brand'],
   OUT_OF_SCOPE: ['범위 밖', 'notice'],
@@ -106,7 +102,7 @@ export default function AdminDashboardPage() {
             {feedback.data?.feedbacks.map((f) => (
               <li key={f.feedbackId} className="flex flex-col gap-0.5 border-t border-line px-5 py-2.5 text-sm">
                 <span className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-brand-strong">{REASON[f.reasonCode] ?? f.reasonCode}</span>
+                  <span className="font-bold text-brand-strong">{dislikeReasonLabel(f.reasonCode)}</span>
                   <span className="text-ink-muted">{formatAdminTime(f.createdAt)}</span>
                 </span>
                 <span className="truncate">{f.questionPreview}</span>

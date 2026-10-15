@@ -7,14 +7,11 @@ import { showToast } from '../../stores/toastStore'
 import { Badge, Card, Chip, Empty, FilterSelect, Pager, TableHead, primaryBtn, secondaryBtn } from './components/AdminUi'
 import { PERIODS, periodFrom, type Period } from './periods'
 import SourceRows from './SourceRows'
+import { DISLIKE_REASONS, dislikeReasonLabel } from '../feedback/reasons'
 
-const REASONS = [
-  ['ALL', '전체'],
-  ['WRONG_INFO', '정보가 정확하지 않아요'],
-  ['NOT_RELATED', '질문과 관련이 없어요'],
-  ['HARD_TO_READ', '이해하기 어려워요'],
-] as const
-const reasonLabel = (r: string) => REASONS.find(([k]) => k === r)?.[1] ?? r
+// 사유 이름은 사용자 시트와 같은 곳에서 가져온다 (기타 포함)
+const REASONS: [ReasonCode | 'ALL', string][] = [['ALL', '전체'], ...DISLIKE_REASONS.map((r): [ReasonCode, string] => [r.code, r.label])]
+const reasonLabel = dislikeReasonLabel
 
 const HANDLED = [
   ['UNHANDLED', '미처리'],

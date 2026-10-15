@@ -18,7 +18,8 @@ export function useMe() {
 export async function afterLogin() {
   // 일시 제한은 사용자(게스트/회원)별이라 계정이 바뀌면 화면 제한을 풀고 서버 판단을 따른다
   liftRestriction()
-  await queryClient.invalidateQueries({ queryKey: meKey })
+  // 화면에 useMe가 없어도(콜백 화면 등) 다음 화면이 새 로그인 수단을 바로 보도록 기다렸다가 넘어간다
+  await queryClient.fetchQuery({ queryKey: meKey, queryFn: authApi.me, staleTime: 0 }).catch(() => undefined)
   await queryClient.invalidateQueries({ queryKey: ['chat'] })
 }
 

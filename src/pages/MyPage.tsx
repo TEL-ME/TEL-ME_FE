@@ -47,7 +47,7 @@ export default function MyPage() {
             {isUser ? (
               <>
                 {/* 이름이 없으면(소셜·이름 저장 전) 이메일로 대신한다 */}
-                <strong className="break-all text-xl font-extrabold leading-[26px]">{me.name ?? me.email ?? '카카오 계정'} 님</strong>
+                <strong className="break-all text-xl font-extrabold leading-[26px]">{me.name ?? me.email ?? '소셜 계정'} 님</strong>
                 <PlanBrief />
               </>
             ) : (
