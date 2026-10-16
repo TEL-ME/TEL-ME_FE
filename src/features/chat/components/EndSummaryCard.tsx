@@ -1,11 +1,10 @@
 import { RotateCw } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import noteImg from '../../../assets/my/mudo-note.png'
-import type { ChatEndSummary } from '../../../api/types'
+import type { ChatEndSummary, EndSummaryInquiry, EndSummaryRemaining } from '../../../api/types'
 import { useEndSummary } from '../endSummaryQueries'
+import { groupInquiries, stripGuidance } from '../endSummaryFormat'
 
-/** 안내 문장은 서버가 "안내받은 내용: "을 붙여 줄 수 있다. 제목이 같은 말이라 화면에서는 뗀다 */
-const stripGuidance = (text: string) => text.replace(/^안내받은 내용\s*:\s*/, '')
 
 function generatedLabel(iso: string | null): string | null {
   if (!iso) return null
@@ -53,13 +52,105 @@ function Bullets({ items }: { items: string[] }) {
   )
 }
 
-function Completed({ summary }: { summary: NonNullable<ChatEndSummary['summary']> }) {
+const REMAINING_KIND: Record<string, { label: string; tag: string }> = {
+  NEEDS_CONFIRMATION: { label: '확인 필요', tag: 'bg-brand-soft text-brand-strong' },
+  UNANSWERED: { label: '답변 못 받음', tag: 'bg-surface-2 text-ink-sub' },
+}
+
+/** 답변 한 개: 3줄까지만 보여 주고, 넘치면 "더 보기"로 펼친다 */
+function ClampedAnswer({ text }: { text: string }) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  const [open, setOpen] = useState(false)
+  const [overflow, setOverflow] = useState(false)
+
+  // 글자 수가 아니라 실제로 3줄을 넘는지 잰다 (화면 폭에 따라 달라진다)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || open || typeof ResizeObserver === 'undefined') return
+    const measure = () => setOverflow(el.scrollHeight > el.clientHeight + 1)
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [open, text])
+
+  return (
+    <div className="flex flex-col items-start gap-0.5 border-l-2 border-line pl-3">
+      <p ref={ref} className={`m-0 break-words text-sm leading-[22px] text-ink-sub ${open ? '' : 'line-clamp-3'}`}>
+        {text}
+      </p>
+      {(overflow || open) && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="py-0.5 text-[13px] font-semibold text-ink-muted underline underline-offset-2"
+        >
+          {open ? '접기' : '더 보기'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** 문의 내용 및 답변 · 남은 사항 (TELME-170 이후 요약) */
+function ByInquiry({ inquiries, remaining }: { inquiries: EndSummaryInquiry[]; remaining: EndSummaryRemaining[] }) {
+  const groups = groupInquiries(inquiries)
+  const rest = remaining.filter((r) => r.text.trim())
+  return (
+    <>
+      {groups.length > 0 && (
+        <Section title="문의 내용 및 답변">
+          <ul className="m-0 flex list-none flex-col gap-3.5 p-0">
+            {groups.map(({ title, texts }) => (
+              <li key={title} className="flex flex-col gap-1">
+                <span className="flex gap-2 text-[15px] font-bold leading-6 text-ink">
+                  <span aria-hidden className="mt-[10px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                  <span className="min-w-0 break-words">{title}</span>
+                </span>
+                <div className="flex flex-col gap-2 pl-3.5">
+                  {texts.map((text, i) => (
+                    <ClampedAnswer key={i} text={text} />
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {/* 남은 사항이 없을 때 "모두 해결됨"처럼 단정하지 않는다: 항목이 있을 때만 보여 준다 */}
+      {rest.length > 0 && (
+        <Section title="남은 사항">
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {rest.map((r, i) => {
+              const kind = REMAINING_KIND[r.kind]
+              return (
+                <li key={i} className="flex items-start gap-2 text-sm leading-[22px] text-ink">
+                  {kind ? (
+                    <span className={`mt-px shrink-0 rounded-md px-1.5 text-xs font-bold leading-5 ${kind.tag}`}>
+                      {kind.label}
+                    </span>
+                  ) : (
+                    <span aria-hidden className="mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                  )}
+                  <span className="min-w-0 break-words">{r.text}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </Section>
+      )}
+    </>
+  )
+}
+
+/** 예전 요약 (문의별 정보가 없을 때): 주요 문의 · 안내받은 내용 · 남은 사항 */
+function ByField({ summary }: { summary: NonNullable<ChatEndSummary['summary']> }) {
   const topics = summary.topics.filter((t) => t.trim())
   const guidance = summary.guidance.map(stripGuidance).filter((t) => t.trim())
   // 남은 사항이 없을 때 "모두 해결됨"처럼 단정하지 않는다: 항목이 있을 때만 보여 준다. 개수 상한도 두지 않는다
   const pending = summary.pendingItems.filter((t) => t.trim())
   return (
-    <div className="flex flex-col gap-3">
+    <>
       {topics.length > 0 && (
         <Section title="주요 문의">
           <Bullets items={topics} />
@@ -81,6 +172,19 @@ function Completed({ summary }: { summary: NonNullable<ChatEndSummary['summary']
         <Section title="남은 사항">
           <Bullets items={pending} />
         </Section>
+      )}
+    </>
+  )
+}
+
+function Completed({ summary }: { summary: NonNullable<ChatEndSummary['summary']> }) {
+  const inquiries = summary.inquiries ?? []
+  return (
+    <div className="flex flex-col gap-3">
+      {inquiries.length > 0 ? (
+        <ByInquiry inquiries={inquiries} remaining={summary.remaining ?? []} />
+      ) : (
+        <ByField summary={summary} />
       )}
       <p className="m-0 text-xs leading-[18px] text-ink-muted">
         대화 기록에서 정리한 내용이에요. 자세한 안내는 위 대화를 확인해 주세요.

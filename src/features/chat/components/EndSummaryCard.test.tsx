@@ -84,6 +84,55 @@ describe('EndSummaryCard', () => {
     expect(screen.queryByText(/해결/)).not.toBeInTheDocument()
   })
 
+  it('문의별 정보가 오면 같은 문의를 한 문단으로 묶고, 남은 사항을 따로 보여 준다', async () => {
+    getSummary.mockResolvedValue(
+      res({
+        summaryStatus: 'COMPLETED',
+        generatedAt: new Date().toISOString(),
+        summary: {
+          topics: ['유심 재발급', '유심 재발급'],
+          guidance: ['비용 안내', '신분증 지참'],
+          pendingItems: ['방문할 지역 확인 필요'],
+          inquiries: [
+            { title: '유심 재발급', text: '비용은 7,700원이에요.' },
+            { title: '유심 재발급', text: '안내받은 내용: 신분증을 챙겨 매장에 방문해 주세요.' },
+          ],
+          remaining: [{ title: '유심 재발급', text: '방문할 지역 확인 필요', kind: 'NEEDS_CONFIRMATION' }],
+        },
+      }),
+    )
+    show()
+    expect(await screen.findByText('문의 내용 및 답변')).toBeInTheDocument()
+    expect(screen.getAllByText('유심 재발급')).toHaveLength(1)
+    expect(screen.getByText('비용은 7,700원이에요.')).toBeInTheDocument()
+    expect(screen.getByText('신분증을 챙겨 매장에 방문해 주세요.')).toBeInTheDocument()
+    expect(screen.getByText('남은 사항')).toBeInTheDocument()
+    expect(screen.getByText('방문할 지역 확인 필요')).toBeInTheDocument()
+    expect(screen.getByText('확인 필요')).toBeInTheDocument()
+    // 예전 방식 칸은 그리지 않는다
+    expect(screen.queryByText('주요 문의')).not.toBeInTheDocument()
+    expect(screen.queryByText('안내받은 내용')).not.toBeInTheDocument()
+  })
+
+  it('문의별 정보가 있고 남은 사항이 없으면 남은 사항 칸을 숨긴다', async () => {
+    getSummary.mockResolvedValue(
+      res({
+        summaryStatus: 'COMPLETED',
+        generatedAt: null,
+        summary: {
+          topics: ['요금제 변경'],
+          guidance: ['다음 날부터 적용'],
+          pendingItems: [],
+          inquiries: [{ title: '요금제 변경', text: '다음 날부터 적용돼요.' }],
+          remaining: [],
+        },
+      }),
+    )
+    show()
+    expect(await screen.findByText('다음 날부터 적용돼요.')).toBeInTheDocument()
+    expect(screen.queryByText('남은 사항')).not.toBeInTheDocument()
+  })
+
   it('준비 중이면 정리 중으로 보이고, 다시 읽어서 완료되면 결과로 바뀐다', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: false })
     getSummary
