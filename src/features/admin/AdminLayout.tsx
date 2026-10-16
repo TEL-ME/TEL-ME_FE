@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { HeartPulse, LayoutDashboard, MessageSquareWarning, NotebookText, Store } from 'lucide-react'
+import { HeartPulse, LayoutDashboard, MessageSquareWarning, NotebookText, Store, Workflow } from 'lucide-react'
 import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import mudoImg from '../../assets/home/mudo-headset.png'
 import Toast from '../../components/Toast'
@@ -12,6 +12,7 @@ const NAV: { to: string; label: string; icon: typeof Store; soon?: boolean }[] =
   { to: '/admin/faqs', label: 'FAQ 관리', icon: NotebookText },
   { to: '/admin/stores', label: '매장 관리', icon: Store },
   { to: '/admin/system', label: '운영 상태', icon: HeartPulse },
+  { to: '/admin/monitoring', label: 'AI 처리 흐름', icon: Workflow },
 ]
 
 /** 관리자 화면 틀 (시안: 왼쪽 메뉴 232px + 본문). 들어올 때 권한을 확인한다 (문서 12번) */

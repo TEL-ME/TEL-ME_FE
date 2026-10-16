@@ -6,6 +6,7 @@ import AdminLayout from '../features/admin/AdminLayout'
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
 import AdminFaqEditPage from '../pages/admin/AdminFaqEditPage'
 import AdminFaqListPage from '../pages/admin/AdminFaqListPage'
+import AdminMonitoringPage from '../pages/admin/AdminMonitoringPage'
 import AdminQualityPage from '../pages/admin/AdminQualityPage'
 import AdminStoreEditPage from '../pages/admin/AdminStoreEditPage'
 import AdminStoresPage from '../pages/admin/AdminStoresPage'
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
       { path: 'stores/new', element: <AdminStoreEditPage /> },
       { path: 'stores/:storeId', element: <AdminStoreEditPage /> },
       { path: 'system', element: <AdminSystemPage /> },
+      { path: 'monitoring', element: <AdminMonitoringPage /> },
       { path: '*', element: <Navigate to="/admin/dashboard" replace /> },
     ],
   },
