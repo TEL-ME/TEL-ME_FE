@@ -1,8 +1,10 @@
 import { RotateCw } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import type { ChatCoordinates } from '../../../api/chat'
 import type { ChatMessage } from '../../../api/types'
 import FeedbackButtons from '../../feedback/FeedbackButtons'
+import ListenButton from '../../speech/ListenButton'
+import { stopSpeech } from '../../speech/speechPlayer'
 import { isBusy, type ChatStatus } from '../chatRunStore'
 import AnswerText from './AnswerText'
 import { BotBubble, PendingUserBubble, UserBubble, type BotTone } from './Bubbles'
@@ -41,6 +43,8 @@ const FALLBACK_ERROR = '답변을 만들지 못했어요. 잠시 후 다시 시�
 
 /** 평가 가능한 답변: 백엔드가 ratable로 알려 준다 (완료된 상담 답변·매장 추천) */
 const canRate = (m: ChatMessage) => m.ratable && m.status === 'COMPLETED'
+/** 답변 듣기: 완료된 챗봇 메시지 전부 (답변·되묻기·매장 결과). 읽을 글이 없으면 숨긴다 */
+const canListen = (m: ChatMessage) => m.role === 'ASSISTANT' && m.status === 'COMPLETED' && !!m.content?.trim()
 
 function dayLabel(iso: string | undefined): string {
   const d = iso ? new Date(iso) : new Date()
@@ -71,6 +75,8 @@ export default function MessageList({
   footer,
 }: MessageListProps) {
   const busy = isBusy(status)
+  // 대화를 바꾸거나 화면을 떠나면 듣던 답변을 멈춘다
+  useEffect(() => () => stopSpeech(), [sessionId])
   const sorted = foldRetried(
     [...messages].sort((a, b) => a.sequenceNo - b.sequenceNo),
     pendingQuestion,
@@ -137,13 +143,17 @@ export default function MessageList({
         const typing = status === 'streaming' && m.messageId === typingMessageId
         const { tone, meta } = toneOf(m)
         const showExtras = !typing
+        const rateable = showExtras && canRate(m) && sessionId != null
+        // 듣기 버튼은 말풍선 안 오른쪽 아래. "참고한 정보"가 있으면 그 줄 오른쪽 끝에 같이 둔다
+        const listen = showExtras && canListen(m) ? <ListenButton messageId={m.messageId} /> : null
+        const hasSources = showExtras && m.messageType === 'ANSWER' && m.answerBasis === 'GROUNDED'
         return (
           <BotBubble
             key={m.messageId}
             tone={tone}
             meta={meta}
             actions={
-              showExtras && canRate(m) && sessionId != null ? (
+              rateable ? (
                 <FeedbackButtons sessionId={sessionId} messageId={m.messageId} myFeedback={m.myFeedback} isUser={isUser} />
               ) : undefined
             }
@@ -161,8 +171,10 @@ export default function MessageList({
             {showExtras && m.storeResults && m.storeResults.length > 0 && (
               <StoreResults items={m.storeResults} context={m.storeSearchContext} closed={closed} />
             )}
-            {showExtras && m.messageType === 'ANSWER' && m.answerBasis === 'GROUNDED' && (
-              <SourceList messageId={m.messageId} />
+            {hasSources ? (
+              <SourceList messageId={m.messageId} trailing={listen} />
+            ) : (
+              listen && <div className="-mb-1 mt-2 flex justify-end">{listen}</div>
             )}
           </BotBubble>
         )

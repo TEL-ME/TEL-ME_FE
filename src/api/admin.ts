@@ -225,6 +225,7 @@ export type LlmTaskType =
   | 'FOLLOW_UP'
   | 'SUMMARY'
   | 'SESSION_TITLE'
+  | 'EVIDENCE_CHECK'
 
 export const LLM_TASKS: [LlmTaskType, string][] = [
   ['ROUTING', '의도 분류'],
@@ -235,6 +236,7 @@ export const LLM_TASKS: [LlmTaskType, string][] = [
   ['FOLLOW_UP', '추천 질문'],
   ['SUMMARY', '대화 요약'],
   ['SESSION_TITLE', '대화 제목'],
+  ['EVIDENCE_CHECK', '근거 판정'],
 ]
 export const taskLabel = (t: string) => LLM_TASKS.find(([k]) => k === t)?.[1] ?? t
 

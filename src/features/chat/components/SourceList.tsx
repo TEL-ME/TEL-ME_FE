@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { chatApi } from '../../../api/chat'
 import { faqApi } from '../../../api/faq'
@@ -13,7 +13,7 @@ import { showToast } from '../../../stores/toastStore'
  * 제목을 누르면 FAQ 화면에서 그 질문을 펼쳐 보여준다. 숨김·삭제된 FAQ면 알리고 흐리게 둔다.
  * 출처가 없으면 아무것도 그리지 않는다.
  */
-export default function SourceList({ messageId }: { messageId: number }) {
+export default function SourceList({ messageId, trailing }: { messageId: number; trailing?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [opening, setOpening] = useState<number | null>(null)
   const listId = useId()
@@ -26,7 +26,8 @@ export default function SourceList({ messageId }: { messageId: number }) {
     staleTime: Infinity,
   })
   const sources = [...(data?.sources ?? [])].sort((a, b) => a.searchRank - b.searchRank)
-  if (sources.length === 0) return null
+  // 출처가 없으면 오른쪽 끝 버튼(듣기)만 남긴다
+  if (sources.length === 0) return trailing ? <div className="-mb-1 mt-2 flex justify-end">{trailing}</div> : null
 
   const openFaq = async (faqId: number) => {
     if (goneIds.includes(faqId)) {
@@ -53,21 +54,24 @@ export default function SourceList({ messageId }: { messageId: number }) {
 
   return (
     <div className="mt-3.5">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[13px] font-semibold leading-[18px] text-ink-sub"
-      >
-        참고한 정보 {sources.length}개
-        <ChevronDown
-          size={14}
-          strokeWidth={2}
-          aria-hidden
-          className={`transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 text-[13px] font-semibold leading-[18px] text-ink-sub"
+        >
+          참고한 정보 {sources.length}개
+          <ChevronDown
+            size={14}
+            strokeWidth={2}
+            aria-hidden
+            className={`transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {trailing}
+      </div>
       {open && (
         <ol id={listId} className="mt-2 flex flex-col gap-1.5">
           {sources.map((s, i) => {

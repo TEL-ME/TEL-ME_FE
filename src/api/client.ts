@@ -46,27 +46,46 @@ export function apiUrl(path: string, query?: Query): string {
  */
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, query, signal } = options
+  // 파일(녹음 등)은 그대로 보내고, 나머지는 JSON으로 보낸다
+  const isBlob = typeof Blob !== 'undefined' && body instanceof Blob
   const res = await fetch(apiUrl(path, query), {
     method,
     credentials: 'include',
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers:
+      body === undefined
+        ? undefined
+        : { 'Content-Type': isBlob ? (body as Blob).type || 'application/octet-stream' : 'application/json' },
+    body: body === undefined ? undefined : isBlob ? (body as Blob) : JSON.stringify(body),
     signal,
   })
 
-  let payload: CustomResponse<T> | null
-  try {
-    payload = (await res.json()) as CustomResponse<T>
-  } catch {
-    payload = null
-  }
-
-  if (!res.ok || !payload || payload.isSuccess === false) {
-    throw new ApiError(
-      res.status,
-      payload?.code ?? String(res.status),
-      payload?.message ?? '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
-    )
-  }
+  const payload = await readPayload<T>(res)
+  if (!res.ok || !payload || payload.isSuccess === false) throw toApiError(res, payload)
   return payload.result
+}
+
+async function readPayload<T>(res: Response): Promise<CustomResponse<T> | null> {
+  try {
+    return (await res.json()) as CustomResponse<T>
+  } catch {
+    return null
+  }
+}
+
+function toApiError(res: Response, payload: CustomResponse<unknown> | null) {
+  return new ApiError(
+    res.status,
+    payload?.code ?? String(res.status),
+    payload?.message ?? '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  )
+}
+
+/**
+ * 파일을 받는 API (예: 답변 음성 mp3). 성공하면 Blob, 실패하면 다른 API와 같은 JSON 오류를 ApiError로 던진다
+ */
+export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  const res = await fetch(apiUrl(path), { credentials: 'include', signal })
+  const type = res.headers.get('Content-Type') ?? ''
+  if (res.ok && !type.includes('json')) return res.blob()
+  throw toApiError(res, await readPayload(res))
 }
