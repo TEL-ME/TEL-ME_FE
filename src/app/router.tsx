@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom'
 import AddEmailLoginPage from '../pages/AddEmailLoginPage'
 import AppLayout from '../layouts/AppLayout'
 import AdminLoginPage from '../pages/AdminLoginPage'
@@ -27,8 +27,9 @@ import SocialMatchPage from '../pages/SocialMatchPage'
 import StoreDetailPage from '../pages/StoreDetailPage'
 import StoreRegionPage from '../pages/StoreRegionPage'
 import StoresPage from '../pages/StoresPage'
+import { RouteErrorScreen } from './ErrorScreen'
 
-export const router = createBrowserRouter([
+const routes: RouteObject[] = [
   {
     element: <AppLayout />,
     children: [
@@ -80,4 +81,7 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <Placeholder title="페이지를 찾을 수 없어요" /> },
-])
+]
+
+// 모든 화면을 하나로 감싸 errorElement를 둔다. 화면 오류가 나면 안내 화면을 보여 주고 Sentry로 보낸다
+export const router = createBrowserRouter([{ errorElement: <RouteErrorScreen />, children: routes }])
