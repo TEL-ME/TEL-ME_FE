@@ -1,0 +1,93 @@
+name: Deploy
+
+# develop에 push되면 빌드해서 S3에 올리고 CloudFront 캐시를 비운다.
+# 인프라(TEL-ME_BE infra/terraform)를 apply하기 전에는 돌지 않게, 저장소 변수 DEPLOY_ENABLED=true일 때만 실행한다.
+# AWS 키는 쓰지 않는다. GitHub OIDC로 telme-github-deploy 역할을 빌린다(develop 브랜치만 허용)
+#
+# 저장소 변수(Settings → Secrets and variables → Actions → Variables)
+#   DEPLOY_ENABLED              true
+#   CLOUDFRONT_DISTRIBUTION_ID  terraform output cloudfront_distribution_id
+#   VITE_KAKAO_MAP_KEY          카카오 지도 JavaScript 키(브라우저에 그대로 노출되는 키라 변수로 둔다)
+#   VITE_SENTRY_DSN             (선택) Sentry DSN. 비우면 오류를 수집하지 않는다
+#   VITE_SENTRY_ENVIRONMENT     (선택) Sentry 환경 이름. 비우면 beta
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write   # OIDC 토큰 발급
+
+env:
+  AWS_REGION: ap-northeast-2
+  AWS_ROLE_ARN: arn:aws:iam::989624287827:role/telme-github-deploy
+  BUCKET: telme-frontend-989624287827
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # FE에는 따로 CI가 없어 여기서 검사한다. 통과한 빌드만 S3에 올라간다
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --run
+
+      # VITE_API_BASE_URL은 비워 둔다: 화면과 API가 같은 CloudFront 주소라 /api로 요청한다.
+      # MSW(가짜 응답)는 개발 서버에서만 켜지므로 운영 빌드에는 들어가지 않는다
+      - name: Build
+        env:
+          VITE_KAKAO_MAP_KEY: ${{ vars.VITE_KAKAO_MAP_KEY }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: ${{ vars.VITE_SENTRY_ENVIRONMENT || 'beta' }}
+        run: npm run build
+
+      - name: AWS 자격 증명(OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # assets/는 파일 이름에 해시가 붙어 내용이 바뀌면 이름도 바뀐다 → 1년 캐시.
+      # index.html 등 나머지는 매번 새로 확인하게 해서 새 배포가 바로 보이게 한다.
+      # 이전 assets는 지우지 않는다(옛 index.html을 연 사용자가 깨지지 않게).
+      # assets 밖의 파일(favicon·manifest 등)은 --delete로 dist에 없는 것을 지운다. --exclude된 assets/는 지우지 않는다
+      - name: S3 업로드
+        run: |
+          aws s3 sync dist/assets "s3://$BUCKET/assets" \
+            --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync dist "s3://$BUCKET" --exclude "assets/*" --delete \
+            --cache-control "no-cache"
+
+      - name: CloudFront 캐시 무효화
+        run: |
+          id=$(aws cloudfront create-invalidation \
+                 --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+                 --paths '/*' --query Invalidation.Id --output text)
+          echo "Invalidation $id"
+          {
+            echo "### 프론트 배포"
+            echo "- 커밋: \`${{ github.sha }}\`"
+            echo "- CloudFront 무효화: \`$id\`"
+          } >> "$GITHUB_STEP_SUMMARY"
