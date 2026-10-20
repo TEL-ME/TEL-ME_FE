@@ -53,7 +53,7 @@ describe('답변을 기다리던 대화를 떠났을 때', () => {
     expect(useBackgroundRuns.getState().ids).toEqual([1])
 
     await subs[0].handlers.onComplete(done(1))
-    expect(notifyAnswer).toHaveBeenCalledWith(1, 'answered')
+    expect(notifyAnswer).toHaveBeenCalledWith(1, 'answered', 7)
     expect(useBackgroundRuns.getState().ids).toEqual([])
     // 지금 보는 대화의 상태는 건드리지 않는다
     expect(useChatRun.getState()).toMatchObject({ sessionId: 2, status: 'idle' })
@@ -118,7 +118,7 @@ describe('질문을 보내는 중(서버 응답 전)에 다른 대화로 옮겼�
     expect(coordsForNext(1, clarify)).toEqual(here)
 
     await subs[0].handlers.onComplete(done(1))
-    expect(notifyAnswer).toHaveBeenCalledWith(1, 'answered')
+    expect(notifyAnswer).toHaveBeenCalledWith(1, 'answered', 7)
     expect(useBackgroundRuns.getState().ids).toEqual([])
   })
 
