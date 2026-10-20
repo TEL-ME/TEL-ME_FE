@@ -41,7 +41,8 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          # 팀 로컬(최신 Node)과 테스트 결과가 같도록 현재 LTS를 쓴다. 22에서는 ListenButton 테스트가 실패한다
+          node-version: '24'
           cache: npm
 
       - name: Install
