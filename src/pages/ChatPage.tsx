@@ -36,8 +36,6 @@ import { sessionsKey, useSessions } from '../features/chat/sessionQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '../stores/toastStore'
 import { useChatScroll } from '../features/chat/useChatScroll'
-import EndSummaryCard from '../features/chat/components/EndSummaryCard'
-import { endSummaryKey } from '../features/chat/endSummaryQueries'
 import { CHAT_GPS_ENABLED, hasChoices, isLocationAsk, wantsNearbyStore } from '../features/chat/storeAsk'
 import { locateErrorMessage, locateMe } from '../features/stores/locate'
 import { rememberMe } from '../features/stores/storeSearchStore'
@@ -211,11 +209,9 @@ export default function ChatPage() {
     setEnding(true)
     try {
       await chatApi.closeSession(activeId)
-      // 종료 응답이 요약 완료를 뜻하지는 않는다. 요약 카드가 상태를 다시 읽으며 기다린다
-      void queryClient.invalidateQueries({ queryKey: endSummaryKey(activeId) })
       await queryClient.invalidateQueries({ queryKey: sessionsKey })
       toBottom()
-      showToast('상담을 종료했어요.\n기록과 요약은 대화 목록에서 다시 볼 수 있어요', 3000)
+      showToast('상담을 종료했어요.\n기록은 대화 목록에서 다시 볼 수 있어요', 3000)
     } catch (e) {
       showToast(e instanceof ApiError ? e.message : '상담을 종료하지 못했어요')
     } finally {
@@ -282,7 +278,6 @@ export default function ChatPage() {
                 onAsk={ask}
                 onRetry={retry}
                 closed={closed}
-                footer={closed && activeId != null ? <EndSummaryCard sessionId={activeId} /> : undefined}
               />
               </>
             ) : (
