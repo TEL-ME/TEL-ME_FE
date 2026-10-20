@@ -15,6 +15,7 @@ import ChatPage from '../pages/ChatPage'
 import EmailLoginPage from '../pages/EmailLoginPage'
 import FaqPage from '../pages/FaqPage'
 import IntroPage from '../pages/IntroPage'
+import NotificationsPage from '../pages/NotificationsPage'
 import MyPage from '../pages/MyPage'
 import MyPlanPage from '../pages/MyPlanPage'
 import PlanSelectPage from '../pages/PlanSelectPage'
@@ -42,6 +43,8 @@ export const router = createBrowserRouter([
       // 자주 묻는 질문. ?id=로 오면 그 FAQ를 맨 위에 펼친다
       { path: '/faq', element: <FaqPage /> },
       { path: '/my', element: <MyPage /> },
+      // 알림: 다른 화면에 있을 때 도착한 답변 (TELME-192)
+      { path: '/my/notifications', element: <NotificationsPage /> },
       // 요금제: 내 요금제(약정·정지·해지) · 가입/변경할 요금제 고르기 (로그인 회원만)
       { path: '/my/plan', element: <MyPlanPage /> },
       { path: '/my/plan/select', element: <PlanSelectPage /> },

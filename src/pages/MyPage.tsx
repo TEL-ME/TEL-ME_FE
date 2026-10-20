@@ -5,11 +5,11 @@ import noteImg from '../assets/my/mudo-note.png'
 import { openLoginSheet } from '../features/auth/loginSheetStore'
 import { useMe } from '../features/auth/useAuth'
 import { useSessions } from '../features/chat/sessionQueries'
+import { useUnreadNotifications } from '../features/notifications/queries'
 import { formatListDate } from '../lib/date'
 import UsageSection from '../features/plans/components/UsageSection'
 import { formatDate, won } from '../features/plans/format'
 import { useSubscription, useUsage } from '../features/plans/queries'
-import { showToast } from '../stores/toastStore'
 
 const BADGE: Record<SessionStatus, { label: string; cls: string }> = {
   NEED_CLARIFICATION: { label: '답변 대기', cls: 'bg-brand-soft text-brand-strong' },
@@ -23,6 +23,7 @@ export default function MyPage() {
   const { me, isUser } = useMe()
   const sessions = useSessions()
   const list = sessions.data?.pages.flatMap((p) => p.sessions) ?? []
+  const unreadNotifications = useUnreadNotifications().data ?? 0
 
   return (
     <main className="no-scrollbar mx-auto w-full max-w-[480px] flex-1 overflow-y-auto">
@@ -32,11 +33,14 @@ export default function MyPage() {
         </h1>
         <button
           type="button"
-          aria-label="알림"
-          onClick={() => showToast('새 알림이 없어요')}
-          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface text-ink"
+          aria-label={unreadNotifications > 0 ? `알림, 안 읽은 알림 ${unreadNotifications}개` : '알림'}
+          onClick={() => navigate('/my/notifications')}
+          className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-surface text-ink"
         >
           <Bell size={20} strokeWidth={1.8} aria-hidden />
+          {unreadNotifications > 0 && (
+            <span aria-hidden className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-danger ring-2 ring-surface" />
+          )}
         </button>
       </header>
 

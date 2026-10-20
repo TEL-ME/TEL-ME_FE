@@ -7,6 +7,7 @@ import { clearUnread, dismissBannersOf, useUnreadAnswers } from '../features/cha
 import AnswerBanners from '../features/chat/components/AnswerBanners'
 import { useBackgroundRuns, useChatRun } from '../features/chat/chatRunStore'
 import DislikeSheet from '../features/feedback/DislikeSheet'
+import { readNotificationsOf } from '../features/notifications/queries'
 import { hasOnboarded } from '../features/onboarding/onboardingFlag'
 
 interface NavItem {
@@ -57,6 +58,11 @@ function useChatBadge(pathname: string): ChatBadge {
     clearUnread(viewingId)
     dismissBannersOf(viewingId)
   }, [viewingId, unread])
+
+  // 그 대화를 열면 그 대화의 알림 목록 항목도 읽음 처리한다
+  useEffect(() => {
+    if (viewingId != null) void readNotificationsOf(viewingId)
+  }, [viewingId])
 
   if (unread.some((id) => id !== viewingId)) return 'arrived'
   // 메인(/)에서 보낸 첫 질문은 주소가 바뀌기 전까지 메인 화면에서 보고 있다

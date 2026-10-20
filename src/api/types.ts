@@ -231,3 +231,26 @@ export interface Me {
   role: 'GUEST' | 'USER' | 'ADMIN'
   loginMethods: LoginMethod[]
 }
+
+// ---- 알림 (TELME-192) ----
+/** ANSWER_ARRIVED: 답변·되묻기·매장 결과 도착 · ANSWER_FAILED: 답변 실패·시간 초과 */
+export type NotificationType = 'ANSWER_ARRIVED' | 'ANSWER_FAILED'
+
+export interface AppNotification {
+  notificationId: number
+  type: NotificationType
+  /** 채팅방 제목. 제목이 만들어지기 전이면 null */
+  title: string | null
+  /** 답변 앞부분(최대 50자). 실패 알림은 비어 있을 수 있다 */
+  body: string | null
+  sessionId: number
+  messageId: number
+  createdAt: string
+  read: boolean
+}
+
+export interface NotificationList {
+  notifications: AppNotification[]
+  nextCursor: number | null
+  hasNext: boolean
+}
