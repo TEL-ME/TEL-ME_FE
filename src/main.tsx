@@ -5,6 +5,7 @@ import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
 import './index.css'
 import App from './App.tsx'
 import { ErrorScreen } from './app/ErrorScreen'
+import { initClarity } from './lib/clarity'
 import { initSentry } from './lib/sentry'
 import { bindThemeToDocument } from './stores/themeStore'
 
@@ -17,6 +18,7 @@ async function enableMocks() {
 
 // 가장 먼저 켜야 첫 화면 오류도 잡힌다 (VITE_SENTRY_DSN이 없으면 꺼진 채로 둔다)
 initSentry()
+initClarity()
 bindThemeToDocument()
 
 void enableMocks().then(() => {

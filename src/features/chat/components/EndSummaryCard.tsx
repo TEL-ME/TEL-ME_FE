@@ -17,7 +17,7 @@ function generatedLabel(iso: string | null): string | null {
 
 function Shell({ sub, children, busy = false }: { sub?: ReactNode; children: ReactNode; busy?: boolean }) {
   return (
-    <section aria-label="상담 요약" aria-busy={busy} className="tm-rise rounded-card bg-surface px-4 pb-4 pt-3.5">
+    <section aria-label="상담 요약" aria-busy={busy} data-clarity-mask="true" className="tm-rise rounded-card bg-surface px-4 pb-4 pt-3.5">
       <header className="flex items-center gap-3">
         <img src={noteImg} alt="" className="h-12 w-12 shrink-0 object-contain" />
         <div className="flex min-w-0 flex-col">
@@ -82,6 +82,8 @@ function ClampedAnswer({ text }: { text: string }) {
         <button
           type="button"
           aria-expanded={open}
+          data-clarity-unmask="true"
+          data-clarity-action={open ? 'summary_collapse' : 'summary_expand'}
           onClick={() => setOpen((v) => !v)}
           className="py-0.5 text-[13px] font-semibold text-ink-muted underline underline-offset-2"
         >

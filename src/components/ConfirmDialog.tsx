@@ -9,6 +9,8 @@ interface ConfirmDialogProps {
   cancelLabel?: string | null
   onConfirm: () => void
   onCancel: () => void
+  /** 상담 종료의 고정 버튼 문구에만 가림 예외와 클릭 기록을 허용한다. */
+  clarityScope?: 'consultation-end'
 }
 
 export default function ConfirmDialog({
@@ -19,6 +21,7 @@ export default function ConfirmDialog({
   cancelLabel = '취소',
   onConfirm,
   onCancel,
+  clarityScope,
 }: ConfirmDialogProps) {
   const titleId = useId()
   const cancelRef = useRef<HTMLButtonElement>(null)
@@ -40,6 +43,7 @@ export default function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-clarity-mask="true"
         className="tm-rise relative flex w-full max-w-[400px] flex-col gap-2.5 rounded-3xl bg-surface px-5 pb-5 pt-6"
       >
         <h2 id={titleId} className="text-[19px] font-extrabold leading-[26px] tracking-[-0.3px]">
@@ -52,6 +56,10 @@ export default function ConfirmDialog({
               ref={cancelRef}
               type="button"
               onClick={onCancel}
+              data-clarity-unmask={clarityScope === 'consultation-end' && cancelLabel === '취소' ? 'true' : undefined}
+              data-clarity-action={
+                clarityScope === 'consultation-end' && cancelLabel === '취소' ? 'consult_end_cancel' : undefined
+              }
               className="min-h-[52px] flex-1 rounded-2xl bg-surface-2 text-base font-bold text-ink"
             >
               {cancelLabel}
@@ -61,6 +69,10 @@ export default function ConfirmDialog({
             ref={confirmRef}
             type="button"
             onClick={onConfirm}
+            data-clarity-unmask={clarityScope === 'consultation-end' && confirmLabel === '종료' ? 'true' : undefined}
+            data-clarity-action={
+              clarityScope === 'consultation-end' && confirmLabel === '종료' ? 'consult_end_confirm' : undefined
+            }
             className="min-h-[52px] flex-1 rounded-2xl bg-inverse text-base font-bold text-inverse-ink"
           >
             {confirmLabel}
