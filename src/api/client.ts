@@ -1,3 +1,4 @@
+import { reportServerError } from '../lib/sentry'
 import type { CustomResponse } from './types'
 
 /** 개발 중에는 비워 두고 Vite 프록시(/api → 백엔드)를 쓴다. 배포 시 API 주소를 넣는다 */
@@ -60,7 +61,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   })
 
   const payload = await readPayload<T>(res)
-  if (!res.ok || !payload || payload.isSuccess === false) throw toApiError(res, payload)
+  if (!res.ok || !payload || payload.isSuccess === false) throw toApiError(res, payload, method, path)
   return payload.result
 }
 
@@ -72,7 +73,9 @@ async function readPayload<T>(res: Response): Promise<CustomResponse<T> | null> 
   }
 }
 
-function toApiError(res: Response, payload: CustomResponse<unknown> | null) {
+function toApiError(res: Response, payload: CustomResponse<unknown> | null, method: string, path: string) {
+  // 5xx만 Sentry로 보낸다 (본문·쿼리 없이 경로와 상태만)
+  reportServerError(method, path, res.status, payload?.code)
   return new ApiError(
     res.status,
     payload?.code ?? String(res.status),
@@ -87,5 +90,5 @@ export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob>
   const res = await fetch(apiUrl(path), { credentials: 'include', signal })
   const type = res.headers.get('Content-Type') ?? ''
   if (res.ok && !type.includes('json')) return res.blob()
-  throw toApiError(res, await readPayload(res))
+  throw toApiError(res, await readPayload(res), 'GET', path)
 }

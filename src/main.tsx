@@ -1,8 +1,11 @@
+import * as Sentry from '@sentry/react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
 import './index.css'
 import App from './App.tsx'
+import { ErrorScreen } from './app/ErrorScreen'
+import { initSentry } from './lib/sentry'
 import { bindThemeToDocument } from './stores/themeStore'
 
 async function enableMocks() {
@@ -12,12 +15,17 @@ async function enableMocks() {
   await worker.start({ onUnhandledRequest: 'bypass', quiet: true })
 }
 
+// 가장 먼저 켜야 첫 화면 오류도 잡힌다 (VITE_SENTRY_DSN이 없으면 꺼진 채로 둔다)
+initSentry()
 bindThemeToDocument()
 
 void enableMocks().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      {/* 라우터 밖(공통 Provider 등)에서 난 오류용. 라우터 안 오류는 router의 errorElement가 잡는다 */}
+      <Sentry.ErrorBoundary fallback={<ErrorScreen />}>
+        <App />
+      </Sentry.ErrorBoundary>
     </StrictMode>,
   )
 })
