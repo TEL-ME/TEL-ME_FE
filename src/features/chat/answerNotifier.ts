@@ -4,6 +4,7 @@ import { chatApi } from '../../api/chat'
 import type { ChatExecutionState, ChatFailure, ChatMessageHistory, ChatSessionList } from '../../api/types'
 import { queryClient } from '../../lib/queryClient'
 import { showToast } from '../../stores/toastStore'
+import { saveNotification } from '../notifications/queries'
 import { messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
 
@@ -197,10 +198,35 @@ export function dismissBannersOf(sessionId: number) {
   }
 }
 
-export async function notifyAnswer(sessionId: number, outcome: AnswerOutcome) {
+// ---- 알림 목록에 남기기 (서버 저장) ----
+
+/** 실패 알림은 실패한 답변 메시지에 단다. 종료 이벤트에는 메시지 번호가 없어 최근 메시지에서 찾는다 */
+async function failedMessageId(sessionId: number): Promise<number | null> {
+  try {
+    const history = await withTimeout(chatApi.getMessages(sessionId, undefined, 5))
+    const failed = history.messages
+      .filter((m) => m.role === 'ASSISTANT' && (m.status === 'FAILED' || m.status === 'TIMEOUT'))
+      .sort((a, b) => b.sequenceNo - a.sequenceNo)[0]
+    return failed?.messageId ?? null
+  } catch {
+    return null
+  }
+}
+
+/** 보고 있지 않은 대화의 답변은 알림 목록(마이 › 알림)에 남긴다 */
+async function recordNotification(sessionId: number, outcome: AnswerOutcome, messageId: number | null) {
+  const id = outcome === 'failed' ? await failedMessageId(sessionId) : messageId
+  if (id == null) return
+  await saveNotification(outcome === 'failed' ? 'ANSWER_FAILED' : 'ANSWER_ARRIVED', sessionId, id)
+}
+
+export async function notifyAnswer(sessionId: number, outcome: AnswerOutcome, messageId: number | null = null) {
   const viewing = () => window.location.pathname === chatPath(sessionId)
   // 그 대화를 보고 있으면 탭이 뒤에 있어도 돌아왔을 때 바로 보이므로 표시하지 않는다
-  if (!viewing()) markUnread(sessionId)
+  if (!viewing()) {
+    markUnread(sessionId)
+    void recordNotification(sessionId, outcome, messageId)
+  }
   const away = isAway()
   if (away) markTitle()
   else if (viewing()) return

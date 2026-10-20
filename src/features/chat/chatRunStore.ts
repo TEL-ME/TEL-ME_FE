@@ -152,7 +152,7 @@ function subscribe(sessionId: number, executionId: number) {
   return subscribeExecution(sessionId, executionId, {
     onComplete: async (state) => {
       reconnectTries = 0
-      const notify = () => void notifyAnswer(sessionId, outcomeOfComplete(state))
+      const notify = () => void notifyAnswer(sessionId, outcomeOfComplete(state), state.outputMessage?.messageId ?? null)
       if (finishInBackground(sessionId, notify)) return
       stopStream = null
       if (get().sessionId !== sessionId) return
