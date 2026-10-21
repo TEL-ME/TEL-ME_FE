@@ -16,6 +16,16 @@ export function usePlans(filter: PlanFilter) {
   })
 }
 
+/** 판매 중인 전체 요금제. 채팅의 요금제 링크에서 이름으로 요금제를 찾을 때만 읽는다 (usePlans와 같은 캐시) */
+export function useAllPlans(enabled: boolean) {
+  return useQuery({
+    queryKey: ['plans', null, null],
+    queryFn: ({ signal }) => planApi.list({}, signal),
+    staleTime: 5 * 60_000,
+    enabled,
+  })
+}
+
 /** 내 가입 정보. 로그인 회원만 (게스트는 401) */
 export function useSubscription() {
   const { me, isUser } = useMe()
