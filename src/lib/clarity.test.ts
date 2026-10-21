@@ -8,207 +8,207 @@ let canRecordClarity: typeof import('./clarity').canRecordClarity
 let addedListeners: { mock: { calls: Parameters<Document['addEventListener']>[] } }
 
 beforeEach(async () => {
-    vi.resetModules()
-    const clarity = await import('./clarity')
-    initClarity = clarity.initClarity
-    stopClarity = clarity.stopClarity
-    canRecordClarity = clarity.canRecordClarity
-    document.body.innerHTML = '<div id="root"></div>'
-    window.history.replaceState(null, '', '/')
-    localStorage.clear()
-    localStorage.setItem('telme-onboarded', '1')
-    document.getElementById('telme-clarity')?.remove()
-    delete window.clarity
-    vi.stubEnv('VITE_CLARITY_ENABLED', 'true')
-    vi.stubEnv('VITE_CLARITY_PROJECT_ID', 'testproject')
-    vi.stubEnv('VITE_CLARITY_ENVIRONMENT', 'local')
-    addedListeners = vi.spyOn(document, 'addEventListener')
+  vi.resetModules()
+  const clarity = await import('./clarity')
+  initClarity = clarity.initClarity
+  stopClarity = clarity.stopClarity
+  canRecordClarity = clarity.canRecordClarity
+  document.body.innerHTML = '<div id="root"></div>'
+  window.history.replaceState(null, '', '/')
+  localStorage.clear()
+  localStorage.setItem('telme-onboarded', '1')
+  document.getElementById('telme-clarity')?.remove()
+  delete window.clarity
+  vi.stubEnv('VITE_CLARITY_ENABLED', 'true')
+  vi.stubEnv('VITE_CLARITY_PROJECT_ID', 'testproject')
+  vi.stubEnv('VITE_CLARITY_ENVIRONMENT', 'local')
+  addedListeners = vi.spyOn(document, 'addEventListener')
 })
 
 afterEach(() => {
-    stopClarity()
-    for (const [type, handler, options] of addedListeners.mock.calls) {
-        if (type === 'click') document.removeEventListener(type, handler, options)
-    }
-    document.getElementById('telme-clarity')?.remove()
-    delete window.clarity
-    localStorage.clear()
-    vi.unstubAllEnvs()
-    vi.restoreAllMocks()
+  stopClarity()
+  for (const [type, handler, options] of addedListeners.mock.calls) {
+    if (type === 'click') document.removeEventListener(type, handler, options)
+  }
+  document.getElementById('telme-clarity')?.remove()
+  delete window.clarity
+  localStorage.clear()
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
 })
 
 describe('클래리티 연결과 전송 범위', () => {
-    it('첫 화면부터 본문 전체를 가린다', () => {
-        expect(page).toContain('<div id="root" data-clarity-mask="true">')
-        initClarity()
-        expect(document.getElementById('root')).toHaveAttribute('data-clarity-mask', 'true')
-    })
+  it('첫 화면부터 본문 전체를 가린다', () => {
+    expect(page).toContain('<div id="root" data-clarity-mask="true">')
+    initClarity()
+    expect(document.getElementById('root')).toHaveAttribute('data-clarity-mask', 'true')
+  })
 
-    it.each(['false', '', undefined])('명시적으로 켜지 않으면 외부 스크립트를 연결하지 않는다: %s', (value) => {
-        vi.stubEnv('VITE_CLARITY_ENABLED', value)
-        expect(initClarity()).toBe(false)
-        expect(document.getElementById('telme-clarity')).toBeNull()
-        expect(window.clarity).toBeUndefined()
-    })
+  it.each(['false', '', undefined])('명시적으로 켜지 않으면 외부 스크립트를 연결하지 않는다: %s', (value) => {
+    vi.stubEnv('VITE_CLARITY_ENABLED', value)
+    expect(initClarity()).toBe(false)
+    expect(document.getElementById('telme-clarity')).toBeNull()
+    expect(window.clarity).toBeUndefined()
+  })
 
-    it.each(['', 'https://example.invalid/private', '번호 010-0000-0000'])('잘못된 프로젝트 값은 연결하지 않는다: %s', (value) => {
-        vi.stubEnv('VITE_CLARITY_PROJECT_ID', value)
-        expect(initClarity()).toBe(false)
-        expect(document.getElementById('telme-clarity')).toBeNull()
-    })
+  it.each(['', 'https://example.invalid/private', '번호 010-0000-0000'])('잘못된 프로젝트 값은 연결하지 않는다: %s', (value) => {
+    vi.stubEnv('VITE_CLARITY_PROJECT_ID', value)
+    expect(initClarity()).toBe(false)
+    expect(document.getElementById('telme-clarity')).toBeNull()
+  })
 
-    it('중복 초기화에도 외부 스크립트와 클릭 기록은 한 번만 연결한다', () => {
-        expect(initClarity()).toBe(true)
-        expect(initClarity()).toBe(true)
-        const script = document.getElementById('telme-clarity') as HTMLScriptElement
-        expect(script.src).toBe('https://www.clarity.ms/tag/testproject')
-        expect(script.async).toBe(true)
-        document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="consult_end_open">상담 종료</button>')
-        document.querySelector('button')?.click()
-        expect(window.clarity?.q).toEqual([
-            ['set', 'environment', 'local'],
-            ['event', 'consult_end_open'],
-        ])
-    })
+  it('중복 초기화에도 외부 스크립트와 클릭 기록은 한 번만 연결한다', () => {
+    expect(initClarity()).toBe(true)
+    expect(initClarity()).toBe(true)
+    const script = document.getElementById('telme-clarity') as HTMLScriptElement
+    expect(script.src).toBe('https://www.clarity.ms/tag/testproject')
+    expect(script.async).toBe(true)
+    document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="consult_end_open">상담 종료</button>')
+    document.querySelector('button')?.click()
+    expect(window.clarity?.q).toEqual([
+      ['set', 'environment', 'local'],
+      ['event', 'consult_end_open'],
+    ])
+  })
 
-    it('버튼 안쪽 요소를 눌러도 동작 이름만 보내고 합성 개인정보는 보내지 않는다', () => {
-        initClarity()
-        document.body.insertAdjacentHTML('beforeend', `
+  it('버튼 안쪽 요소를 눌러도 동작 이름만 보내고 합성 개인정보는 보내지 않는다', () => {
+    initClarity()
+    document.body.insertAdjacentHTML('beforeend', `
             <button data-clarity-action="consult_end_open"><span>합성 고객 beta@example.invalid</span></button>
         `)
-        document.querySelector('button span')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        expect(window.clarity?.q?.at(-1)).toEqual(['event', 'consult_end_open'])
-        expect(JSON.stringify(window.clarity?.q)).not.toContain('beta@example.invalid')
-    })
+    document.querySelector('button span')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(window.clarity?.q?.at(-1)).toEqual(['event', 'consult_end_open'])
+    expect(JSON.stringify(window.clarity?.q)).not.toContain('beta@example.invalid')
+  })
 
-    it('허용하지 않은 동작과 비활성 버튼은 사용자 문구를 이벤트로 보내지 않는다', () => {
-        initClarity()
-        document.body.insertAdjacentHTML('beforeend', `
+  it('허용하지 않은 동작과 비활성 버튼은 사용자 문구를 이벤트로 보내지 않는다', () => {
+    initClarity()
+    document.body.insertAdjacentHTML('beforeend', `
             <button data-clarity-action="010-0000-0000">합성 번호</button>
             <button disabled data-clarity-action="consult_end_confirm">종료</button>
         `)
-        document.querySelectorAll('button').forEach((button) => {
-            button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        })
-        expect(window.clarity?.q).toEqual([['set', 'environment', 'local']])
+    document.querySelectorAll('button').forEach((button) => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
+    expect(window.clarity?.q).toEqual([['set', 'environment', 'local']])
+  })
 
-    it.each(['summary_expand', 'summary_collapse'])('삭제된 요약 화면의 동작은 기록하지 않는다: %s', (action) => {
-        initClarity()
-        const button = document.createElement('button')
-        button.setAttribute('data-clarity-action', action)
-        document.body.appendChild(button)
-        button.click()
-        expect(window.clarity?.q).toEqual([['set', 'environment', 'local']])
-    })
+  it.each(['summary_expand', 'summary_collapse'])('삭제된 요약 화면의 동작은 기록하지 않는다: %s', (action) => {
+    initClarity()
+    const button = document.createElement('button')
+    button.setAttribute('data-clarity-action', action)
+    document.body.appendChild(button)
+    button.click()
+    expect(window.clarity?.q).toEqual([['set', 'environment', 'local']])
+  })
 
-    it.each(['/', '/faq', '/auth/login'])('온보딩 완료 전에는 주소에 직접 들어와도 연결하지 않는다: %s', (path) => {
-        localStorage.removeItem('telme-onboarded')
-        window.history.replaceState(null, '', path)
+  it.each(['/', '/faq', '/auth/login'])('온보딩 완료 전에는 주소에 직접 들어와도 연결하지 않는다: %s', (path) => {
+    localStorage.removeItem('telme-onboarded')
+    window.history.replaceState(null, '', path)
 
-        expect(initClarity()).toBe(false)
-        expect(document.getElementById('telme-clarity')).toBeNull()
-        expect(window.clarity).toBeUndefined()
-    })
+    expect(initClarity()).toBe(false)
+    expect(document.getElementById('telme-clarity')).toBeNull()
+    expect(window.clarity).toBeUndefined()
+  })
 
-    it.each([
-        '/admin', '/admin/login', '/admin/monitoring', '/ADMIN/faqs', '/%61dmin/faqs', '/onboarding',
-    ])('온보딩 완료 기기도 제외 화면에서는 연결하지 않는다: %s', (path) => {
-        window.history.replaceState(null, '', path)
+  it.each([
+    '/admin', '/admin/login', '/admin/monitoring', '/ADMIN/faqs', '/%61dmin/faqs', '/onboarding',
+  ])('온보딩 완료 기기도 제외 화면에서는 연결하지 않는다: %s', (path) => {
+    window.history.replaceState(null, '', path)
 
-        expect(initClarity()).toBe(false)
-        expect(document.getElementById('telme-clarity')).toBeNull()
-        expect(window.clarity).toBeUndefined()
-    })
+    expect(initClarity()).toBe(false)
+    expect(document.getElementById('telme-clarity')).toBeNull()
+    expect(window.clarity).toBeUndefined()
+  })
 
-    it('완료 상태를 읽을 수 없는 브라우저에서는 수집하지 않는다', () => {
-        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('저장소 차단') })
+  it('완료 상태를 읽을 수 없는 브라우저에서는 수집하지 않는다', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('저장소 차단') })
 
-        expect(initClarity()).toBe(false)
-        expect(document.getElementById('telme-clarity')).toBeNull()
-    })
+    expect(initClarity()).toBe(false)
+    expect(document.getElementById('telme-clarity')).toBeNull()
+  })
 
-    it('제외 화면에서는 기존 수집을 중단하고 추가 클릭을 보내지 않는다', () => {
-        initClarity()
-        const stoppedPaths: string[] = []
-        window.clarity = Object.assign(vi.fn((method: unknown) => {
-            if (method === 'stop') stoppedPaths.push(window.location.pathname)
-        }), { v: '테스트 SDK' })
+  it('제외 화면에서는 기존 수집을 중단하고 추가 클릭을 보내지 않는다', () => {
+    initClarity()
+    const stoppedPaths: string[] = []
+    window.clarity = Object.assign(vi.fn((method: unknown) => {
+      if (method === 'stop') stoppedPaths.push(window.location.pathname)
+    }), { v: '테스트 SDK' })
 
-        window.history.pushState(null, '', '/admin/monitoring')
+    window.history.pushState(null, '', '/admin/monitoring')
 
-        expect(initClarity()).toBe(false)
-        expect(stoppedPaths).toEqual(['/admin/monitoring'])
-        document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="chat_new">관리자 버튼</button>')
-        document.querySelector('button')?.click()
-        expect(window.clarity).toHaveBeenCalledTimes(1)
-    })
+    expect(initClarity()).toBe(false)
+    expect(stoppedPaths).toEqual(['/admin/monitoring'])
+    document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="chat_new">관리자 버튼</button>')
+    document.querySelector('button')?.click()
+    expect(window.clarity).toHaveBeenCalledTimes(1)
+  })
 
-    it('SDK가 로딩되기 전 관리자로 이동하면 대기 중인 시작 요청도 지운다', () => {
-        initClarity()
-        const config = { projectId: 'testproject' }
-        window.clarity?.('start', config)
+  it('SDK가 로딩되기 전 관리자로 이동하면 대기 중인 시작 요청도 지운다', () => {
+    initClarity()
+    const config = { projectId: 'testproject' }
+    window.clarity?.('start', config)
 
-        window.history.pushState(null, '', '/admin')
-        expect(initClarity()).toBe(false)
+    window.history.pushState(null, '', '/admin')
+    expect(initClarity()).toBe(false)
 
-        expect(window.clarity?.q).toEqual([])
-        window.clarity?.('start', config)
-        expect(window.clarity?.q).toEqual([])
-        expect(initClarity()).toBe(false)
+    expect(window.clarity?.q).toEqual([])
+    window.clarity?.('start', config)
+    expect(window.clarity?.q).toEqual([])
+    expect(initClarity()).toBe(false)
 
-        window.history.replaceState(null, '', '/faq')
-        expect(initClarity()).toBe(true)
-        expect(window.clarity?.q).toContainEqual(['start', config])
-        expect(document.querySelectorAll('#telme-clarity')).toHaveLength(1)
-    })
+    window.history.replaceState(null, '', '/faq')
+    expect(initClarity()).toBe(true)
+    expect(window.clarity?.q).toContainEqual(['start', config])
+    expect(document.querySelectorAll('#telme-clarity')).toHaveLength(1)
+  })
 
-    it('중단 후 재개할 때 클릭 기록을 중복 연결하지 않는다', () => {
-        initClarity()
-        const sdk = Object.assign(vi.fn(), { v: '테스트 SDK' })
-        window.clarity = sdk
+  it('중단 후 재개할 때 클릭 기록을 중복 연결하지 않는다', () => {
+    initClarity()
+    const sdk = Object.assign(vi.fn(), { v: '테스트 SDK' })
+    window.clarity = sdk
 
-        stopClarity()
-        expect(sdk).toHaveBeenCalledWith('stop')
-        expect(initClarity()).toBe(true)
-        expect(initClarity()).toBe(true)
-        sdk.mockClear()
-        document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="consult_end_open">상담 종료</button>')
-        document.querySelector('button')?.click()
-        expect(sdk.mock.calls).toEqual([['event', 'consult_end_open']])
-    })
+    stopClarity()
+    expect(sdk).toHaveBeenCalledWith('stop')
+    expect(initClarity()).toBe(true)
+    expect(initClarity()).toBe(true)
+    sdk.mockClear()
+    document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="consult_end_open">상담 종료</button>')
+    document.querySelector('button')?.click()
+    expect(sdk.mock.calls).toEqual([['event', 'consult_end_open']])
+  })
 
-    it('수집 중 완료 표시가 없어지면 중단한다', () => {
-        initClarity()
-        const sdk = Object.assign(vi.fn(), { v: '테스트 SDK' })
-        window.clarity = sdk
-        localStorage.removeItem('telme-onboarded')
+  it('수집 중 완료 표시가 없어지면 중단한다', () => {
+    initClarity()
+    const sdk = Object.assign(vi.fn(), { v: '테스트 SDK' })
+    window.clarity = sdk
+    localStorage.removeItem('telme-onboarded')
 
-        expect(initClarity()).toBe(false)
-        expect(sdk).toHaveBeenCalledWith('stop')
-    })
+    expect(initClarity()).toBe(false)
+    expect(sdk).toHaveBeenCalledWith('stop')
+  })
 
-    it('연결 여부와 관계없이 브라우저의 주소 이동 함수를 바꾸지 않는다', () => {
-        vi.stubEnv('VITE_CLARITY_ENABLED', 'false')
-        const pushState = window.history.pushState
-        const replaceState = window.history.replaceState
+  it('연결 여부와 관계없이 브라우저의 주소 이동 함수를 바꾸지 않는다', () => {
+    vi.stubEnv('VITE_CLARITY_ENABLED', 'false')
+    const pushState = window.history.pushState
+    const replaceState = window.history.replaceState
 
-        expect(initClarity()).toBe(false)
-        expect(window.history.pushState).toBe(pushState)
-        expect(window.history.replaceState).toBe(replaceState)
-        vi.stubEnv('VITE_CLARITY_ENABLED', 'true')
-        expect(initClarity()).toBe(true)
-        expect(window.history.pushState).toBe(pushState)
-        expect(window.history.replaceState).toBe(replaceState)
-    })
+    expect(initClarity()).toBe(false)
+    expect(window.history.pushState).toBe(pushState)
+    expect(window.history.replaceState).toBe(replaceState)
+    vi.stubEnv('VITE_CLARITY_ENABLED', 'true')
+    expect(initClarity()).toBe(true)
+    expect(window.history.pushState).toBe(pushState)
+    expect(window.history.replaceState).toBe(replaceState)
+  })
 
-    it('이동할 경로의 수집 가능 여부를 현재 주소를 바꾸지 않고 확인한다', () => {
-        expect(canRecordClarity('/faq')).toBe(true)
-        expect(canRecordClarity('/settings')).toBe(true)
-        expect(canRecordClarity('/admin/login')).toBe(false)
-        expect(canRecordClarity('/%61dmin/monitoring')).toBe(false)
-        expect(canRecordClarity('/onboarding')).toBe(false)
-        expect(canRecordClarity('/%')).toBe(false)
-        expect(window.location.pathname).toBe('/')
-    })
+  it('이동할 경로의 수집 가능 여부를 현재 주소를 바꾸지 않고 확인한다', () => {
+    expect(canRecordClarity('/faq')).toBe(true)
+    expect(canRecordClarity('/settings')).toBe(true)
+    expect(canRecordClarity('/admin/login')).toBe(false)
+    expect(canRecordClarity('/%61dmin/monitoring')).toBe(false)
+    expect(canRecordClarity('/onboarding')).toBe(false)
+    expect(canRecordClarity('/%')).toBe(false)
+    expect(window.location.pathname).toBe('/')
+  })
 })
