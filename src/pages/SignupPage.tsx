@@ -11,6 +11,7 @@ import { takeLoginReturn } from '../features/auth/loginSheetStore'
 import { signupSchema, type SignupForm } from '../features/auth/schemas'
 import { afterLogin } from '../features/auth/useAuth'
 import { showToast } from '../stores/toastStore'
+import { track } from '../lib/analytics'
 
 const DUPLICATE = 'MEMBER409-0'
 
@@ -67,6 +68,7 @@ export default function SignupPage() {
     try {
       await authApi.signup(name, email, password)
       await afterLogin()
+      track('sign_up', { method: 'email' })
       showToast('가입을 마쳤어요. 게스트로 나눈 상담도 이어져요')
       navigate(takeLoginReturn(), { replace: true })
     } catch (e) {
