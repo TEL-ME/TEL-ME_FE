@@ -3,8 +3,7 @@ import page from '../../index.html?raw'
 
 let initClarity: typeof import('./clarity').initClarity
 let stopClarity: typeof import('./clarity').stopClarity
-let bindClarityNavigation: typeof import('./clarity').bindClarityNavigation
-let unbindNavigation: (() => void) | undefined
+let canRecordClarity: typeof import('./clarity').canRecordClarity
 
 let addedListeners: { mock: { calls: Parameters<Document['addEventListener']>[] } }
 
@@ -13,7 +12,7 @@ beforeEach(async () => {
     const clarity = await import('./clarity')
     initClarity = clarity.initClarity
     stopClarity = clarity.stopClarity
-    bindClarityNavigation = clarity.bindClarityNavigation
+    canRecordClarity = clarity.canRecordClarity
     document.body.innerHTML = '<div id="root"></div>'
     window.history.replaceState(null, '', '/')
     localStorage.clear()
@@ -27,8 +26,6 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
-    unbindNavigation?.()
-    unbindNavigation = undefined
     stopClarity()
     for (const [type, handler, options] of addedListeners.mock.calls) {
         if (type === 'click') document.removeEventListener(type, handler, options)
@@ -131,8 +128,7 @@ describe('클래리티 연결과 전송 범위', () => {
         expect(document.getElementById('telme-clarity')).toBeNull()
     })
 
-    it('주소가 관리자 화면으로 바뀌기 전에 SDK를 중단한다', () => {
-        unbindNavigation = bindClarityNavigation()
+    it('제외 화면에서는 기존 수집을 중단하고 추가 클릭을 보내지 않는다', () => {
         initClarity()
         const stoppedPaths: string[] = []
         window.clarity = Object.assign(vi.fn((method: unknown) => {
@@ -141,20 +137,20 @@ describe('클래리티 연결과 전송 범위', () => {
 
         window.history.pushState(null, '', '/admin/monitoring')
 
-        expect(stoppedPaths).toEqual(['/'])
         expect(initClarity()).toBe(false)
+        expect(stoppedPaths).toEqual(['/admin/monitoring'])
         document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="chat_new">관리자 버튼</button>')
         document.querySelector('button')?.click()
         expect(window.clarity).toHaveBeenCalledTimes(1)
     })
 
     it('SDK가 로딩되기 전 관리자로 이동하면 대기 중인 시작 요청도 지운다', () => {
-        unbindNavigation = bindClarityNavigation()
         initClarity()
         const config = { projectId: 'testproject' }
         window.clarity?.('start', config)
 
         window.history.pushState(null, '', '/admin')
+        expect(initClarity()).toBe(false)
 
         expect(window.clarity?.q).toEqual([])
         window.clarity?.('start', config)
@@ -167,13 +163,12 @@ describe('클래리티 연결과 전송 범위', () => {
         expect(document.querySelectorAll('#telme-clarity')).toHaveLength(1)
     })
 
-    it('뒤로 가기에서도 중단하고 재개할 때 클릭 기록을 중복 연결하지 않는다', () => {
-        unbindNavigation = bindClarityNavigation()
+    it('중단 후 재개할 때 클릭 기록을 중복 연결하지 않는다', () => {
         initClarity()
         const sdk = Object.assign(vi.fn(), { v: '테스트 SDK' })
         window.clarity = sdk
 
-        window.dispatchEvent(new PopStateEvent('popstate'))
+        stopClarity()
         expect(sdk).toHaveBeenCalledWith('stop')
         expect(initClarity()).toBe(true)
         expect(initClarity()).toBe(true)
@@ -193,14 +188,27 @@ describe('클래리티 연결과 전송 범위', () => {
         expect(sdk).toHaveBeenCalledWith('stop')
     })
 
-    it('기능이 꺼져 있으면 브라우저의 주소 이동 처리도 바꾸지 않는다', () => {
+    it('연결 여부와 관계없이 브라우저의 주소 이동 함수를 바꾸지 않는다', () => {
         vi.stubEnv('VITE_CLARITY_ENABLED', 'false')
         const pushState = window.history.pushState
         const replaceState = window.history.replaceState
 
-        unbindNavigation = bindClarityNavigation()
-
+        expect(initClarity()).toBe(false)
         expect(window.history.pushState).toBe(pushState)
         expect(window.history.replaceState).toBe(replaceState)
+        vi.stubEnv('VITE_CLARITY_ENABLED', 'true')
+        expect(initClarity()).toBe(true)
+        expect(window.history.pushState).toBe(pushState)
+        expect(window.history.replaceState).toBe(replaceState)
+    })
+
+    it('이동할 경로의 수집 가능 여부를 현재 주소를 바꾸지 않고 확인한다', () => {
+        expect(canRecordClarity('/faq')).toBe(true)
+        expect(canRecordClarity('/settings')).toBe(true)
+        expect(canRecordClarity('/admin/login')).toBe(false)
+        expect(canRecordClarity('/%61dmin/monitoring')).toBe(false)
+        expect(canRecordClarity('/onboarding')).toBe(false)
+        expect(canRecordClarity('/%')).toBe(false)
+        expect(window.location.pathname).toBe('/')
     })
 })

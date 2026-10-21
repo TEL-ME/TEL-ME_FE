@@ -30,7 +30,6 @@ import StoreRegionPage from '../pages/StoreRegionPage'
 import StoresPage from '../pages/StoresPage'
 import { RouteErrorScreen } from './ErrorScreen'
 import ClarityRouteTracker from '../lib/ClarityRouteTracker'
-import { bindClarityNavigation } from '../lib/clarity'
 
 const routes: RouteObject[] = [
   {
@@ -89,8 +88,6 @@ const routes: RouteObject[] = [
 ]
 
 // 모든 화면을 하나로 감싸 errorElement를 둔다. 화면 오류가 나면 안내 화면을 보여 주고 Sentry로 보낸다
-// 뒤로·앞으로 가기에서 화면 반영 후 다시 중단되지 않도록 라우터의 주소 변경 구독보다 먼저 설치한다.
-bindClarityNavigation()
 export const router = createBrowserRouter([
   { element: <ClarityRouteTracker />, errorElement: <RouteErrorScreen />, children: routes },
 ])

@@ -9,7 +9,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string | null
   onConfirm: () => void
   onCancel: () => void
-  /** 상담 종료의 고정 버튼 문구에만 가림 예외와 클릭 기록을 허용한다. */
+  /** 클릭은 상담 종료 범위로 구분하고, 가림 예외는 확인된 고정 문구에만 허용한다. */
   clarityScope?: 'consultation-end'
 }
 
@@ -58,7 +58,7 @@ export default function ConfirmDialog({
               onClick={onCancel}
               data-clarity-unmask={clarityScope === 'consultation-end' && cancelLabel === '취소' ? 'true' : undefined}
               data-clarity-action={
-                clarityScope === 'consultation-end' && cancelLabel === '취소' ? 'consult_end_cancel' : undefined
+                clarityScope === 'consultation-end' ? 'consult_end_cancel' : undefined
               }
               className="min-h-[52px] flex-1 rounded-2xl bg-surface-2 text-base font-bold text-ink"
             >
@@ -71,7 +71,7 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             data-clarity-unmask={clarityScope === 'consultation-end' && confirmLabel === '종료' ? 'true' : undefined}
             data-clarity-action={
-              clarityScope === 'consultation-end' && confirmLabel === '종료' ? 'consult_end_confirm' : undefined
+              clarityScope === 'consultation-end' ? 'consult_end_confirm' : undefined
             }
             className="min-h-[52px] flex-1 rounded-2xl bg-inverse text-base font-bold text-inverse-ink"
           >

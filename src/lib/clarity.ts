@@ -10,6 +10,7 @@ const SCRIPT_ID = 'telme-clarity'
 const ONBOARDING_KEY = 'telme-onboarded'
 let recordingRequested = false
 let pendingStart: unknown[] | undefined
+let initialQueue: Clarity | undefined
 const ACTIONS = new Set([
     'consult_end_open',
     'consult_end_confirm',
@@ -23,10 +24,13 @@ const ACTIONS = new Set([
     'nav_settings',
 ])
 
-function canRecord(): boolean {
+export function canRecordClarity(pathname = window.location.pathname): boolean {
     try {
-        const pathname = decodeURIComponent(window.location.pathname).replace(/\/{2,}/g, '/')
-        return !/^\/(admin|onboarding)(\/|$)/i.test(pathname)
+        const projectId = import.meta.env.VITE_CLARITY_PROJECT_ID?.trim()
+        const normalizedPath = decodeURIComponent(pathname).replace(/\/{2,}/g, '/')
+        return import.meta.env.VITE_CLARITY_ENABLED === 'true'
+            && !!projectId && /^[a-z0-9]{5,32}$/i.test(projectId)
+            && !/^\/(admin|onboarding)(\/|$)/i.test(normalizedPath)
             && localStorage.getItem(ONBOARDING_KEY) === '1'
     } catch {
         // 저장소나 주소를 확인할 수 없으면 수집하지 않는다. 화면의 온보딩 처리 방식은 변경하지 않는다.
@@ -37,11 +41,7 @@ function canRecord(): boolean {
 /** 화면이 반영된 뒤 호출한다. 사용자 식별자나 상담 본문은 별도로 보내지 않는다. */
 export function initClarity(): boolean {
     const projectId = import.meta.env.VITE_CLARITY_PROJECT_ID?.trim()
-    if (import.meta.env.VITE_CLARITY_ENABLED !== 'true' || !projectId || !/^[a-z0-9]{5,32}$/i.test(projectId)) {
-        stopClarity()
-        return false
-    }
-    if (!canRecord()) {
+    if (!canRecordClarity()) {
         stopClarity()
         return false
     }
@@ -54,8 +54,9 @@ export function initClarity(): boolean {
         const clarity: Clarity = (...args: unknown[]) => {
             if (args[0] === 'start') pendingStart = args.slice(1)
             // 느린 SDK가 관리자 화면에 도착한 뒤 초기화돼도 시작 요청을 보류한다.
-            if (canRecord() && recordingRequested) (clarity.q ??= []).push(args)
+            if (canRecordClarity() && recordingRequested) (clarity.q ??= []).push(args)
         }
+        initialQueue = clarity
         window.clarity = clarity
 
         const script = document.createElement('script')
@@ -89,33 +90,13 @@ export function stopClarity(): void {
     recordingRequested = false
 }
 
-/** SDK가 주소 변경을 감지해 자동 재시작하기 전에 중단하고, 새 화면의 수집 여부는 라우터에서 판단한다. */
-export function bindClarityNavigation(): () => void {
-    if (import.meta.env.VITE_CLARITY_ENABLED !== 'true') return () => {}
-    const pushState = window.history.pushState
-    const replaceState = window.history.replaceState
-    const beforePush: History['pushState'] = function (this: History, ...args) {
-        stopClarity()
-        return pushState.apply(this, args)
-    }
-    const beforeReplace: History['replaceState'] = function (this: History, ...args) {
-        stopClarity()
-        return replaceState.apply(this, args)
-    }
-    window.history.pushState = beforePush
-    window.history.replaceState = beforeReplace
-    window.addEventListener('popstate', stopClarity)
-
-    return () => {
-        stopClarity()
-        window.removeEventListener('popstate', stopClarity)
-        if (window.history.pushState === beforePush) window.history.pushState = pushState
-        if (window.history.replaceState === beforeReplace) window.history.replaceState = replaceState
-    }
+/** 최초 로더 대기와 SDK 자체의 고객 화면 재시작 대기를 구분한다. */
+export function isClarityRestartPending(): boolean {
+    return recordingRequested && !!window.clarity && window.clarity !== initialQueue && !window.clarity.v
 }
 
 function recordFixedAction(event: MouseEvent) {
-    if (!recordingRequested || !canRecord()) return
+    if (!recordingRequested || !canRecordClarity()) return
     const target = event.target instanceof Element ? event.target.closest('[data-clarity-action]') : null
     if (!target || target.matches(':disabled') || target.getAttribute('aria-disabled') === 'true') return
     const action = target.getAttribute('data-clarity-action')
