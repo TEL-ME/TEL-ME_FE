@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Plan } from '../../api/plans'
-import { barPercent, contractDiscount, formatData, monthLabel, overAmount, planAllowance, shiftMonth, toMonthKey } from './format'
+import type { MonthUsage, Plan, ResourceUsage } from '../../api/plans'
+import { barPercent, contractDiscount, exceededItems, exceededWarning, formatData, monthLabel, overAmount, planAllowance, shiftMonth, toMonthKey } from './format'
 
 const plan = (patch: Partial<Plan> = {}): Plan => ({
   planId: 1, code: 'P1', name: '5G 슬림', networkType: 'FIVE_G', targetGroup: 'GENERAL', monthlyFee: 55_000,
@@ -45,5 +45,32 @@ describe('월 이동', () => {
     expect(shiftMonth('2026-12', 1)).toBe('2027-01')
     expect(toMonthKey('2026-09-01')).toBe('2026-09')
     expect(monthLabel('2026-09')).toBe('2026년 9월')
+  })
+})
+
+describe('바꿀 요금제 한도 초과 (TELME-202)', () => {
+  const used = (n: number): ResourceUsage => ({ used: n, limit: null, remaining: null, percent: null, unlimited: true, exceeded: false })
+  const usage = (dataMb: number, voice: number, sms: number): MonthUsage => ({
+    month: '2026-10-01', daysUntilBilling: 10, paused: false,
+    data: used(dataMb), voice: used(voice), sms: used(sms), expectedFee: null,
+  })
+
+  it('데이터는 GB를 MB(×1024)로 바꿔 비교하고, 같으면 초과가 아니다', () => {
+    const p = plan({ dataGb: 50 })
+    expect(exceededItems(usage(50 * 1024, 0, 0), p)).toEqual([])
+    expect(exceededItems(usage(100 * 1024, 0, 0), p)).toEqual(['데이터 100GB(한도 50GB)'])
+  })
+
+  it('통화·문자도 한도를 넘으면 함께 알리고, 무제한 항목은 비교하지 않는다', () => {
+    const limited = plan({ dataGb: 10, voiceUnlimited: false, voiceMinutes: 100, smsUnlimited: false, smsCount: 50 })
+    expect(exceededItems(usage(1024, 150, 51), limited)).toEqual(['통화 150분(한도 100분)', '문자 51건(한도 50건)'])
+    expect(exceededItems(usage(999_999, 9_999, 9_999), plan({ unlimited: true, dataGb: null }))).toEqual([])
+  })
+
+  it('경고 문구는 채팅 변경 안내와 같고, 초과가 없으면 null', () => {
+    expect(exceededWarning(usage(100 * 1024, 0, 0), plan({ dataGb: 50 }))).toBe(
+      '이번 달 사용량이 이 요금제 한도를 넘어요: 데이터 100GB(한도 50GB). 바꾸면 이번 달은 한도를 넘은 것으로 표시되고, 이미 쓴 사용량은 줄지 않아요. 추가 요금은 없어요.',
+    )
+    expect(exceededWarning(usage(1024, 0, 0), plan({ dataGb: 50 }))).toBeNull()
   })
 })

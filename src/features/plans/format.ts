@@ -1,4 +1,4 @@
-import type { NetworkType, Plan, ResourceUsage, TargetGroup } from '../../api/plans'
+import type { MonthUsage, NetworkType, Plan, ResourceUsage, TargetGroup } from '../../api/plans'
 
 export const NETWORK_LABEL: Record<NetworkType, string> = { FIVE_G: '5G', LTE: 'LTE', BUDGET: '알뜰' }
 export const TARGET_LABEL: Record<TargetGroup, string> = { GENERAL: '일반', YOUTH: '청소년', SENIOR: '시니어' }
@@ -37,6 +37,33 @@ export function planAllowance(plan: Plan): { data: string; voice: string; sms: s
     voice: plan.voiceUnlimited || plan.voiceMinutes == null ? '무제한' : `${plan.voiceMinutes.toLocaleString('ko-KR')}분`,
     sms: plan.smsUnlimited || plan.smsCount == null ? '무제한' : `${plan.smsCount.toLocaleString('ko-KR')}건`,
   }
+}
+
+/**
+ * 요금제를 바꾸면 이번 달 한도가 새 요금제 기준이 되고 이미 쓴 사용량은 그대로다.
+ * 이번 달 사용량이 바꿀 요금제 한도를 넘는 항목을 "데이터 12GB(한도 8GB)"처럼 돌려준다 (백엔드 채팅 변경 안내와 같은 기준).
+ * 무제한 항목은 빼고, 사용량 > 한도일 때만 초과다(같으면 초과 아님). 데이터 한도는 GB × 1024 = MB로 비교한다
+ */
+export function exceededItems(usage: MonthUsage, plan: Plan): string[] {
+  const items: string[] = []
+  if (!plan.unlimited && plan.dataGb != null) {
+    const limitMb = Math.round(plan.dataGb * 1024)
+    if (usage.data.used > limitMb) items.push(`데이터 ${formatData(usage.data.used)}(한도 ${formatData(limitMb)})`)
+  }
+  if (!plan.voiceUnlimited && plan.voiceMinutes != null && usage.voice.used > plan.voiceMinutes) {
+    items.push(`통화 ${formatAmount('voice', usage.voice.used)}(한도 ${formatAmount('voice', plan.voiceMinutes)})`)
+  }
+  if (!plan.smsUnlimited && plan.smsCount != null && usage.sms.used > plan.smsCount) {
+    items.push(`문자 ${formatAmount('sms', usage.sms.used)}(한도 ${formatAmount('sms', plan.smsCount)})`)
+  }
+  return items
+}
+
+/** 초과 항목이 있으면 변경 확인 단계에 보여 줄 경고 문구 (변경은 막지 않는다). 없으면 null */
+export function exceededWarning(usage: MonthUsage, plan: Plan): string | null {
+  const items = exceededItems(usage, plan)
+  if (items.length === 0) return null
+  return `이번 달 사용량이 이 요금제 한도를 넘어요: ${items.join(', ')}. 바꾸면 이번 달은 한도를 넘은 것으로 표시되고, 이미 쓴 사용량은 줄지 않아요. 추가 요금은 없어요.`
 }
 
 /** 사용량 막대 너비(%). 초과해도 100에서 멈춘다 */

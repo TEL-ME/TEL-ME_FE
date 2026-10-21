@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Plan, Subscription, SubscriptionMe, TerminationPenalty } from '../api/plans'
+import type { Plan, Subscription, SubscriptionMe, TerminationPenalty, UsageOverview } from '../api/plans'
 import { ApiError } from '../api/client'
 
 const meState = { isUser: true }
@@ -22,6 +22,7 @@ const api = {
   cancel: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
+  usage: vi.fn<() => Promise<UsageOverview>>(),
 }
 vi.mock('../api/plans', () => ({
   planApi: { list: () => api.list() },
@@ -34,7 +35,7 @@ vi.mock('../api/plans', () => ({
     pause: (d: number) => api.pause(d),
     resume: () => api.resume(),
   },
-  usageApi: { me: vi.fn() },
+  usageApi: { me: () => api.usage() },
 }))
 
 const { default: PlanSelectPage } = await import('./PlanSelectPage')
@@ -116,6 +117,65 @@ describe('요금제 가입', () => {
     fireEvent.click(screen.getByRole('button', { name: '이 요금제로 변경' }))
     expect(await screen.findByText('내 요금제 화면')).toBeInTheDocument()
     expect(api.changePlan).toHaveBeenCalledWith({ planId: 2, birthDate: undefined })
+  })
+})
+
+describe('채팅 링크로 연 요금제 고르기·변경 경고 (TELME-191·202)', () => {
+  const showAt = (url: string) =>
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={[url]}>
+          <Routes>
+            <Route path="/my/plan/select" element={<PlanSelectPage />} />
+            <Route path="/my/plan" element={<p>내 요금제 화면</p>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+  const usageOf = (dataMb: number): UsageOverview => ({
+    status: 'ACTIVE', activatesAt: null, availableFrom: '2026-10-01', availableTo: '2026-10-01',
+    usage: {
+      month: '2026-10-01', daysUntilBilling: 10, paused: false,
+      data: { used: dataMb, limit: null, remaining: null, percent: null, unlimited: true, exceeded: false },
+      voice: { used: 10, limit: null, remaining: null, percent: null, unlimited: true, exceeded: false },
+      sms: { used: 1, limit: null, remaining: null, percent: null, unlimited: true, exceeded: false },
+      expectedFee: null,
+    },
+  })
+
+  it('?planId=로 열면 그 요금제를 고른 상태로 연다', async () => {
+    api.me.mockResolvedValue({ subscribed: false, subscription: null })
+    showAt('/my/plan/select?planId=2')
+    expect(await screen.findByRole('radio', { name: /청소년 요금제/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('button', { name: '가입하기' })).toBeInTheDocument()
+  })
+
+  it('지금 쓰는 요금제를 가리키면 고르지 않는다', async () => {
+    api.me.mockResolvedValue({ subscribed: true, subscription: subscription() })
+    showAt('/my/plan/select?planId=1')
+    expect(await screen.findByRole('radio', { name: /요금제 1/ })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.queryByRole('button', { name: '이 요금제로 변경' })).not.toBeInTheDocument()
+  })
+
+  it('변경할 요금제 한도를 이번 달 사용량이 넘으면 경고하되 변경은 막지 않는다', async () => {
+    api.me.mockResolvedValue({ subscribed: true, subscription: subscription({ currentPlan: plan(1, { unlimited: true, dataGb: null }) }) })
+    api.usage.mockResolvedValue(usageOf(100 * 1024))
+    api.list.mockResolvedValue([plan(1, { unlimited: true, dataGb: null }), plan(3, { name: '50GB 요금제', dataGb: 50 })])
+    api.changePlan.mockResolvedValue(subscription())
+    showAt('/my/plan/select?planId=3')
+    expect(await screen.findByText(/이번 달 사용량이 이 요금제 한도를 넘어요: 데이터 100GB\(한도 50GB\)/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '이 요금제로 변경' }))
+    expect(await screen.findByText('내 요금제 화면')).toBeInTheDocument()
+    expect(api.changePlan).toHaveBeenCalledWith({ planId: 3, birthDate: undefined })
+  })
+
+  it('한도 안이면 경고하지 않는다', async () => {
+    api.me.mockResolvedValue({ subscribed: true, subscription: subscription() })
+    api.usage.mockResolvedValue(usageOf(5 * 1024))
+    showAt('/my/plan/select?planId=2')
+    expect(await screen.findByRole('button', { name: '이 요금제로 변경' })).toBeInTheDocument()
+    expect(screen.queryByText(/한도를 넘어요/)).not.toBeInTheDocument()
   })
 })
 
