@@ -15,7 +15,7 @@ export type AnalyticsEvent =
   | 'question_send'
   | 'faq_source_open'
   | 'plan_link_click'
-  | 'consult_end_click'
+  | 'consult_end_open'
   | 'consult_end_confirm'
   | 'consult_end_success'
   | 'login'

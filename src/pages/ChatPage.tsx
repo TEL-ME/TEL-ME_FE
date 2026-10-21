@@ -296,7 +296,7 @@ export default function ChatPage() {
                 type="button"
                 disabled={busy || ending}
                 onClick={() => {
-                    track('consult_end_click')
+                    track('consult_end_open')
                     setConfirmEnd(true)}}
                 className="pointer-events-auto flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold text-ink-sub shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-50"
               >
