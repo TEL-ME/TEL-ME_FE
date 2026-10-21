@@ -4,6 +4,7 @@ import type { Me } from '../../api/types'
 import { queryClient } from '../../lib/queryClient'
 import { attachSession, stopBackgroundStreams } from '../chat/chatRunStore'
 import { liftRestriction } from '../chat/inputGuardStore'
+import { track } from '../../lib/analytics'
 
 export const meKey = ['auth', 'me'] as const
 const GUEST: Me = { authenticated: false, userId: null, email: null, name: null, role: 'GUEST', loginMethods: [] }
@@ -16,6 +17,7 @@ export function useMe() {
 
 /** 로그인·가입 직후: 게스트 대화가 계정으로 옮겨지므로 대화 관련 캐시를 새로 읽는다 */
 export async function afterLogin() {
+  track('login')
   // 일시 제한은 사용자(게스트/회원)별이라 계정이 바뀌면 화면 제한을 풀고 서버 판단을 따른다
   liftRestriction()
   // 화면에 useMe가 없어도(콜백 화면 등) 다음 화면이 새 로그인 수단을 바로 보도록 기다렸다가 넘어간다
@@ -24,6 +26,7 @@ export async function afterLogin() {
 }
 
 export async function logout() {
+  track('logout')
   try {
     await authApi.logout()
   } finally {

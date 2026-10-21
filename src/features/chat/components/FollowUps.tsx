@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { planTaskPath } from '../planTaskLinks'
+import { track } from '../../../lib/analytics'
 
 interface FollowUpsProps {
   items: string[]
@@ -27,7 +28,9 @@ export default function FollowUps({ items, disabled, onAsk, choices = false }: F
         <button
           key={label}
           type="button"
-          onClick={() => navigate(planTaskPath(label)!)}
+          onClick={() => {
+            track('plan_link_click', { label })
+            navigate(planTaskPath(label)!)}}
           className="inline-flex min-h-9 items-center gap-0.5 rounded-full bg-brand-soft py-1.5 pl-3.5 pr-2.5 text-sm font-bold leading-5 text-brand-strong"
         >
           {label}

@@ -7,6 +7,7 @@ import { faqApi } from '../../../api/faq'
 import { GONE_FAQ_MESSAGE, markFaqGone, useGoneFaqs } from '../../faq/goneFaqs'
 import { faqDetailKey, isFaqGone } from '../../faq/queries'
 import { showToast } from '../../../stores/toastStore'
+import { track } from '../../../lib/analytics'
 
 /**
  * 답변 아래 "참고한 정보 N개" 접기·펼치기 (문서 8번). FAQ 제목만 보이고 유사도 점수는 숨긴다.
@@ -59,7 +60,9 @@ export default function SourceList({ messageId, trailing }: { messageId: number;
           type="button"
           aria-expanded={open}
           aria-controls={listId}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            if (!open) track('faq_source_open')
+            setOpen((v) => !v)}}
           className="flex items-center gap-1.5 text-[13px] font-semibold leading-[18px] text-ink-sub"
         >
           참고한 정보 {sources.length}개
