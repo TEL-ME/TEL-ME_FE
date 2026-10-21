@@ -1,11 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import page from '../../index.html?raw'
-import { initClarity } from './clarity'
+
+let initClarity: typeof import('./clarity').initClarity
+let stopClarity: typeof import('./clarity').stopClarity
+let bindClarityNavigation: typeof import('./clarity').bindClarityNavigation
+let unbindNavigation: (() => void) | undefined
 
 let addedListeners: { mock: { calls: Parameters<Document['addEventListener']>[] } }
 
-beforeEach(() => {
+beforeEach(async () => {
+    vi.resetModules()
+    const clarity = await import('./clarity')
+    initClarity = clarity.initClarity
+    stopClarity = clarity.stopClarity
+    bindClarityNavigation = clarity.bindClarityNavigation
     document.body.innerHTML = '<div id="root"></div>'
+    window.history.replaceState(null, '', '/')
+    localStorage.clear()
+    localStorage.setItem('telme-onboarded', '1')
     document.getElementById('telme-clarity')?.remove()
     delete window.clarity
     vi.stubEnv('VITE_CLARITY_ENABLED', 'true')
@@ -15,11 +27,15 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+    unbindNavigation?.()
+    unbindNavigation = undefined
+    stopClarity()
     for (const [type, handler, options] of addedListeners.mock.calls) {
         if (type === 'click') document.removeEventListener(type, handler, options)
     }
     document.getElementById('telme-clarity')?.remove()
     delete window.clarity
+    localStorage.clear()
     vi.unstubAllEnvs()
     vi.restoreAllMocks()
 })
@@ -87,5 +103,104 @@ describe('클래리티 연결과 전송 범위', () => {
         document.body.appendChild(button)
         button.click()
         expect(window.clarity?.q).toEqual([['set', 'environment', 'local']])
+    })
+
+    it.each(['/', '/faq', '/auth/login'])('온보딩 완료 전에는 주소에 직접 들어와도 연결하지 않는다: %s', (path) => {
+        localStorage.removeItem('telme-onboarded')
+        window.history.replaceState(null, '', path)
+
+        expect(initClarity()).toBe(false)
+        expect(document.getElementById('telme-clarity')).toBeNull()
+        expect(window.clarity).toBeUndefined()
+    })
+
+    it.each([
+        '/admin', '/admin/login', '/admin/monitoring', '/ADMIN/faqs', '/%61dmin/faqs', '/onboarding',
+    ])('온보딩 완료 기기도 제외 화면에서는 연결하지 않는다: %s', (path) => {
+        window.history.replaceState(null, '', path)
+
+        expect(initClarity()).toBe(false)
+        expect(document.getElementById('telme-clarity')).toBeNull()
+        expect(window.clarity).toBeUndefined()
+    })
+
+    it('완료 상태를 읽을 수 없는 브라우저에서는 수집하지 않는다', () => {
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('저장소 차단') })
+
+        expect(initClarity()).toBe(false)
+        expect(document.getElementById('telme-clarity')).toBeNull()
+    })
+
+    it('주소가 관리자 화면으로 바뀌기 전에 SDK를 중단한다', () => {
+        unbindNavigation = bindClarityNavigation()
+        initClarity()
+        const stoppedPaths: string[] = []
+        window.clarity = Object.assign(vi.fn((method: unknown) => {
+            if (method === 'stop') stoppedPaths.push(window.location.pathname)
+        }), { v: '테스트 SDK' })
+
+        window.history.pushState(null, '', '/admin/monitoring')
+
+        expect(stoppedPaths).toEqual(['/'])
+        expect(initClarity()).toBe(false)
+        document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="chat_new">관리자 버튼</button>')
+        document.querySelector('button')?.click()
+        expect(window.clarity).toHaveBeenCalledTimes(1)
+    })
+
+    it('SDK가 로딩되기 전 관리자로 이동하면 대기 중인 시작 요청도 지운다', () => {
+        unbindNavigation = bindClarityNavigation()
+        initClarity()
+        const config = { projectId: 'testproject' }
+        window.clarity?.('start', config)
+
+        window.history.pushState(null, '', '/admin')
+
+        expect(window.clarity?.q).toEqual([])
+        window.clarity?.('start', config)
+        expect(window.clarity?.q).toEqual([])
+        expect(initClarity()).toBe(false)
+
+        window.history.replaceState(null, '', '/faq')
+        expect(initClarity()).toBe(true)
+        expect(window.clarity?.q).toContainEqual(['start', config])
+        expect(document.querySelectorAll('#telme-clarity')).toHaveLength(1)
+    })
+
+    it('뒤로 가기에서도 중단하고 재개할 때 클릭 기록을 중복 연결하지 않는다', () => {
+        unbindNavigation = bindClarityNavigation()
+        initClarity()
+        const sdk = Object.assign(vi.fn(), { v: '테스트 SDK' })
+        window.clarity = sdk
+
+        window.dispatchEvent(new PopStateEvent('popstate'))
+        expect(sdk).toHaveBeenCalledWith('stop')
+        expect(initClarity()).toBe(true)
+        expect(initClarity()).toBe(true)
+        sdk.mockClear()
+        document.body.insertAdjacentHTML('beforeend', '<button data-clarity-action="consult_end_open">상담 종료</button>')
+        document.querySelector('button')?.click()
+        expect(sdk.mock.calls).toEqual([['event', 'consult_end_open']])
+    })
+
+    it('수집 중 완료 표시가 없어지면 중단한다', () => {
+        initClarity()
+        const sdk = Object.assign(vi.fn(), { v: '테스트 SDK' })
+        window.clarity = sdk
+        localStorage.removeItem('telme-onboarded')
+
+        expect(initClarity()).toBe(false)
+        expect(sdk).toHaveBeenCalledWith('stop')
+    })
+
+    it('기능이 꺼져 있으면 브라우저의 주소 이동 처리도 바꾸지 않는다', () => {
+        vi.stubEnv('VITE_CLARITY_ENABLED', 'false')
+        const pushState = window.history.pushState
+        const replaceState = window.history.replaceState
+
+        unbindNavigation = bindClarityNavigation()
+
+        expect(window.history.pushState).toBe(pushState)
+        expect(window.history.replaceState).toBe(replaceState)
     })
 })
