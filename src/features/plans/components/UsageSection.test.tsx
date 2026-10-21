@@ -50,6 +50,14 @@ describe('UsageSection', () => {
     expect(screen.getByRole('button', { name: '이전 달' })).toBeEnabled()
   })
 
+  it('요금제를 바꿔 사용률이 100%를 크게 넘어도 막대는 100%에서 멈추고 초과로 보여 준다', async () => {
+    usageMe.mockResolvedValue(active(month('2026-10', true, { data: res(25 * 1024, 8 * 1024) })))
+    show()
+    expect(await screen.findByText('17GB 초과')).toBeInTheDocument()
+    expect(screen.getByText('313% 사용 · 25GB 씀')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: '데이터 사용률' })).toHaveAttribute('aria-valuenow', '100')
+  })
+
   it('한도를 넘으면 초과량과 "한도 초과"를 보여 준다', async () => {
     usageMe.mockResolvedValue(active(month('2026-10', true, { data: res(1300, 1024), paused: true })))
     show()
