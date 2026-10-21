@@ -27,7 +27,9 @@ function show(cached: Me) {
   fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }))
 }
 
-beforeEach(() => me.mockReset())
+beforeEach(() => {
+  me.mockReset()
+})
 
 describe('OnboardingPage 로그인 상태', () => {
   it('게스트로 기억하던 탭이라도 다른 탭에서 로그인했으면 이미 로그인된 화면을 보여 준다', async () => {
