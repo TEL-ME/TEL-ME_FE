@@ -90,7 +90,14 @@ export function stopClarity(): void {
   recordingRequested = false
 }
 
-/** 최초 로더 대기와 SDK 자체의 고객 화면 재시작 대기를 구분한다. */
+/**
+ * 로컬에서 관찰한 SDK 0.8.72-beta와 공개 소스를 근거로 최초 로더 대기와 SDK 재시작 대기를 구분한다.
+ * core/history.ts는 주소 변경 시 stop() 후 재시작을 예약한다(설정값 또는 기본 250ms, 실제 대기 상한 아님).
+ * clarity.ts의 stop()은 queue.setup()으로 .v 없는 함수를 만들고, queue.ts의 process()가 .v를 다시 붙인다.
+ * 수집 요청 중 최초 로더와 다른 .v 없는 함수를 재시작 대기로 추정한다. 공식 상태 API가 아니므로 SDK 변경 시 재확인한다.
+ * 근거: https://github.com/microsoft/clarity/blob/master/packages/clarity-js/src/core/history.ts
+ * https://github.com/microsoft/clarity/blob/master/packages/clarity-js/src/queue.ts
+ */
 export function isClarityRestartPending(): boolean {
   return recordingRequested && !!window.clarity && window.clarity !== initialQueue && !window.clarity.v
 }
