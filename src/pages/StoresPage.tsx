@@ -19,6 +19,7 @@ import {
   type SearchOrigin,
 } from '../features/stores/storeSearchStore'
 import { showToast } from '../stores/toastStore'
+import { useDragScroll } from '../lib/useDragScroll'
 
 /** 목록 시트가 차지하는 높이 (화면 높이에 대한 비율) */
 const SHEET_PEEK = 0.46
@@ -59,6 +60,8 @@ function emptyCopy(origin: SearchOrigin, filtered: boolean): { title: string; te
 /** 매장 (지도 + 목록 한 화면). 목록은 아래 시트에 있고, 손잡이를 올리면 넓어진다 */
 export default function StoresPage() {
   const navigate = useNavigate()
+  // 업무 선택 칩 줄을 PC 마우스로도 끌어서 넘긴다
+  const serviceDrag = useDragScroll<HTMLDivElement>()
   const { origin, services, me, selectedId, sheetFull } = useStoreSearch()
   const serviceTypes = useServiceTypes()
   const list = useStoreList(origin, services, me)
@@ -280,7 +283,7 @@ export default function StoresPage() {
           </p>
         ) : serviceTypes.data && serviceTypes.data.length > 0 ? (
           <>
-            <div role="group" aria-label="업무 선택" className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-1.5">
+            <div {...serviceDrag} role="group" aria-label="업무 선택" className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-1.5">
               {serviceTypes.data.map((t) => {
                 const on = services.includes(t.code)
                 return (
