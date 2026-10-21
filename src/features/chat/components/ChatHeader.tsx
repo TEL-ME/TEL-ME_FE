@@ -12,7 +12,10 @@ const iconButton =
 export default function ChatHeader({ busy, onOpenList, onNewChat }: ChatHeaderProps) {
   return (
     <header className="flex shrink-0 items-center gap-3 bg-bg p-4">
-      <button type="button" aria-label="대화 목록" onClick={onOpenList} className={iconButton}>
+      <button
+        type="button" aria-label="대화 목록" data-clarity-unmask="true" data-clarity-action="chat_list_open"
+        onClick={onOpenList} className={iconButton}
+      >
         <Menu size={20} strokeWidth={1.8} aria-hidden />
       </button>
       <div className="min-w-0 flex-1">
@@ -27,7 +30,10 @@ export default function ChatHeader({ busy, onOpenList, onNewChat }: ChatHeaderPr
           {busy ? '답변을 준비하는 중' : '무러바라와 이야기하는 중'}
         </p>
       </div>
-      <button type="button" aria-label="새 대화" onClick={onNewChat} disabled={busy} className={iconButton}>
+      <button
+        type="button" aria-label="새 대화" data-clarity-unmask="true" data-clarity-action="chat_new"
+        onClick={onNewChat} disabled={busy} className={iconButton}
+      >
         <Plus size={20} strokeWidth={1.8} aria-hidden />
       </button>
     </header>

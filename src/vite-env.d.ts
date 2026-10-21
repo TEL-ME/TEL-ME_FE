@@ -13,6 +13,10 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN?: string
   /** Sentry에서 구분할 환경 이름 (local / beta) */
   readonly VITE_SENTRY_ENVIRONMENT?: string
+  /** 클래리티는 명시적으로 켠 환경에서만 수집한다. 설정 변경 후 다시 빌드해야 한다. */
+  readonly VITE_CLARITY_ENABLED?: string
+  readonly VITE_CLARITY_PROJECT_ID?: string
+  readonly VITE_CLARITY_ENVIRONMENT?: 'local' | 'beta'
 }
 
 interface ImportMeta {
