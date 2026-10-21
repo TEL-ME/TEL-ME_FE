@@ -6,6 +6,7 @@ import FaqItem from '../features/faq/FaqItem'
 import { GONE_FAQ_MESSAGE, markFaqGone } from '../features/faq/goneFaqs'
 import { isFaqGone, useFaqDetail, useFaqList } from '../features/faq/queries'
 import { showToast } from '../stores/toastStore'
+import { useDragScroll } from '../lib/useDragScroll'
 
 const parseId = (v: string | null) => (v && /^\d+$/.test(v) ? Number(v) : null)
 
@@ -29,6 +30,8 @@ function CategoryChip({ on, onClick, children }: { on: boolean; onClick: () => v
  * /faq?id=123: 상담의 "참고한 정보"에서 눌러 온 경우. 그 FAQ를 맨 위에 펼쳐 두고 카테고리도 맞춘다.
  */
 export default function FaqPage() {
+  // 카테고리 줄을 PC 마우스로도 끌어서 넘긴다
+  const categoryDrag = useDragScroll<HTMLDivElement>()
   const [params, setParams] = useSearchParams()
   const pinnedId = parseId(params.get('id'))
   const detail = useFaqDetail(pinnedId)
@@ -118,7 +121,7 @@ export default function FaqPage() {
             </button>
           )}
         </label>
-        <div role="group" aria-label="카테고리" className="no-scrollbar flex gap-1.5 overflow-x-auto px-4">
+        <div {...categoryDrag} role="group" aria-label="카테고리" className="no-scrollbar flex gap-1.5 overflow-x-auto px-4">
           <CategoryChip on={category === null} onClick={() => pickCategory(null)}>
             전체
           </CategoryChip>

@@ -1,6 +1,6 @@
-import { Check } from 'lucide-react'
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Check, TriangleAlert } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { subscriptionApi, type NetworkType, type Plan, type TargetGroup } from '../api/plans'
 import TextField from '../components/TextField'
@@ -12,11 +12,13 @@ import {
   NETWORK_LABEL,
   TARGET_LABEL,
   contractDiscount,
+  exceededWarning,
   formatDate,
   needsBirthDate,
   won,
 } from '../features/plans/format'
-import { refreshSubscription, usePlans, useSubscription } from '../features/plans/queries'
+import { refreshSubscription, usePlans, useSubscription, useUsage } from '../features/plans/queries'
+import { useDragScroll } from '../lib/useDragScroll'
 import { showToast } from '../stores/toastStore'
 
 const chip = (on: boolean) =>
@@ -45,35 +47,74 @@ export default function PlanSelectPage() {
 
 function PlanSelect() {
   const navigate = useNavigate()
+  // 필터 칩 줄을 PC 마우스로도 끌어서 넘긴다
+  const networkDrag = useDragScroll<HTMLDivElement>()
+  const targetDrag = useDragScroll<HTMLDivElement>()
   const sub = useSubscription()
   const [networkType, setNetworkType] = useState<NetworkType | null>(null)
   const [targetGroup, setTargetGroup] = useState<TargetGroup | null>(null)
   const plans = usePlans({ networkType: networkType ?? undefined, targetGroup: targetGroup ?? undefined })
   const [picked, setPicked] = useState<Plan | null>(null)
+  // 채팅의 요금제 링크에서 왔으면(?planId=) 그 요금제를 고른 채로 연다. 직접 고르면 그 선택을 따른다
+  const [params] = useSearchParams()
+  const presetId = Number(params.get('planId')) || null
+  const [touched, setTouched] = useState(false)
+  const selectedRef = useRef<HTMLLIElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
+  // 변경할 때 이번 달 사용량이 고른 요금제 한도를 넘는지 보여 주려고 읽는다
+  const usage = useUsage(null)
   const [contract, setContract] = useState(false)
   const [birthDate, setBirthDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (sub.isPending) return <p className="tm-pulse px-5 py-10 text-center text-sm text-ink-sub">불러오는 중…</p>
   const current = sub.data?.subscription
   const changing = sub.data?.subscribed === true
   // 변경할 때 지금 요금제(개통 전이면 개통 예정 요금제)는 고를 수 없다
   const currentPlanId = current?.currentPlan?.planId ?? current?.pendingActivation?.plan.planId ?? null
+  const preset =
+    !touched && presetId != null && !(changing && presetId === currentPlanId)
+      ? (plans.data?.find((p) => p.planId === presetId) ?? null)
+      : null
+  const selected = picked ?? preset
+
+  // 변경 확인 단계: 이번 달 사용량이 고른 요금제 한도를 넘으면 알린다 (변경은 막지 않는다)
+  const monthUsage = usage.data?.status === 'ACTIVE' ? usage.data.usage : null
+  const warning = changing && selected && monthUsage ? exceededWarning(monthUsage, selected) : null
+
+  // 고른 요금제 카드가 아래 고정 시트에 가려지면, 가려진 만큼 목록을 올린다
+  // (채팅 링크로 미리 고른 요금제가 목록 아래쪽에 있을 때도 같은 방법으로 보여 준다).
+  // 시트는 sticky라 scrollIntoView로는 가림을 알 수 없어 화면 위치로 직접 계산한다. 경고가 늦게 붙어 시트가 커지면 다시 맞춘다
+  const selectedId = sub.isPending ? null : (selected?.planId ?? null)
+  const hasWarning = warning != null
+  useEffect(() => {
+    if (selectedId == null) return
+    const frame = requestAnimationFrame(() => {
+      const card = selectedRef.current
+      const sheet = sheetRef.current
+      if (!card || !sheet) return
+      const hidden = card.getBoundingClientRect().bottom + 12 - sheet.getBoundingClientRect().top
+      if (hidden > 0) scrollParent(card).scrollBy?.({ top: hidden, behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selectedId, hasWarning])
+
+  if (sub.isPending) return <p className="tm-pulse px-5 py-10 text-center text-sm text-ink-sub">불러오는 중…</p>
 
   const pick = (plan: Plan) => {
     setPicked(plan)
+    setTouched(true)
     setError(null)
   }
 
   const submit = async () => {
-    if (!picked) return
+    if (!selected) return
     setSubmitting(true)
     setError(null)
-    const birth = needsBirthDate(picked) && birthDate ? birthDate : undefined
+    const birth = needsBirthDate(selected) && birthDate ? birthDate : undefined
     try {
       if (changing) {
-        const res = await subscriptionApi.changePlan({ planId: picked.planId, birthDate: birth })
+        const res = await subscriptionApi.changePlan({ planId: selected.planId, birthDate: birth })
         await refreshSubscription()
         showToast(
           res.pendingChange
@@ -82,7 +123,7 @@ function PlanSelect() {
           3000,
         )
       } else {
-        const res = await subscriptionApi.subscribe({ planId: picked.planId, birthDate: birth, contract })
+        const res = await subscriptionApi.subscribe({ planId: selected.planId, birthDate: birth, contract })
         await refreshSubscription()
         showToast(
           res.pendingActivation
@@ -100,17 +141,18 @@ function PlanSelect() {
     }
   }
 
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-col gap-2 px-4 pb-3 pt-1">
-        <div role="group" aria-label="망 구분" className="no-scrollbar flex gap-1.5 overflow-x-auto">
+        <div {...networkDrag} role="group" aria-label="망 구분" className="no-scrollbar flex gap-1.5 overflow-x-auto">
           {NETWORKS.map((n) => (
             <button key={n ?? 'all'} type="button" aria-pressed={networkType === n} onClick={() => setNetworkType(n)} className={chip(networkType === n)}>
               {n ? NETWORK_LABEL[n] : '전체'}
             </button>
           ))}
         </div>
-        <div role="group" aria-label="대상 구분" className="no-scrollbar flex gap-1.5 overflow-x-auto">
+        <div {...targetDrag} role="group" aria-label="대상 구분" className="no-scrollbar flex gap-1.5 overflow-x-auto">
           {TARGETS.map((t) => (
             <button key={t ?? 'all'} type="button" aria-pressed={targetGroup === t} onClick={() => setTargetGroup(t)} className={chip(targetGroup === t)}>
               {t ? TARGET_LABEL[t] : '모든 대상'}
@@ -133,9 +175,9 @@ function PlanSelect() {
           <ul role="radiogroup" aria-label="요금제" className="m-0 flex list-none flex-col gap-2.5 p-0">
             {plans.data.map((plan) => {
               const isCurrent = changing && plan.planId === currentPlanId
-              const on = picked?.planId === plan.planId
+              const on = selected?.planId === plan.planId
               return (
-                <li key={plan.planId}>
+                <li key={plan.planId} ref={on ? selectedRef : undefined}>
                   <button
                     type="button"
                     role="radio"
@@ -162,18 +204,18 @@ function PlanSelect() {
         )}
       </div>
 
-      {picked && (
-        <div className="sticky bottom-0 z-[2] flex flex-col gap-3 rounded-t-[26px] bg-surface px-4 pb-4 pt-4 shadow-[0_-6px_20px_rgba(0,0,0,0.08)]">
+      {selected && (
+        <div ref={sheetRef} className="sticky bottom-0 z-[2] flex flex-col gap-3 rounded-t-[26px] bg-surface px-4 pb-4 pt-4 shadow-[0_-6px_20px_rgba(0,0,0,0.08)]">
           <div className="flex items-baseline justify-between gap-3">
-            <strong className="min-w-0 truncate text-[15px] font-extrabold">{picked.name}</strong>
+            <strong className="min-w-0 truncate text-[15px] font-extrabold">{selected.name}</strong>
             <span className="shrink-0 text-[15px] font-extrabold">
               {contract && !changing ? (
                 <>
-                  <span className="mr-1.5 text-xs font-semibold text-ink-muted line-through">{won(picked.monthlyFee)}</span>
-                  {won(picked.monthlyFee - contractDiscount(picked.monthlyFee))}
+                  <span className="mr-1.5 text-xs font-semibold text-ink-muted line-through">{won(selected.monthlyFee)}</span>
+                  {won(selected.monthlyFee - contractDiscount(selected.monthlyFee))}
                 </>
               ) : (
-                won(picked.monthlyFee)
+                won(selected.monthlyFee)
               )}
               <span className="text-xs font-semibold text-ink-muted"> /월</span>
             </span>
@@ -190,22 +232,29 @@ function PlanSelect() {
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-[15px] font-bold">약정으로 가입 ({CONTRACT_MONTHS}개월)</span>
                 <span className="text-[13px] leading-[18px] text-ink-sub">
-                  매달 <strong className="text-brand-text">{won(contractDiscount(picked.monthlyFee))}</strong> 할인
+                  매달 <strong className="text-brand-text">{won(contractDiscount(selected.monthlyFee))}</strong> 할인
                   (월정액 {CONTRACT_DISCOUNT_PERCENT}%). 약정 기간 안에 해지하면 위약금이 있어요.
                 </span>
               </span>
             </label>
           )}
 
-          {needsBirthDate(picked) && (
+          {needsBirthDate(selected) && (
             <TextField
               label="생년월일"
               type="date"
               value={birthDate}
               max={new Date().toISOString().slice(0, 10)}
               onChange={(e) => setBirthDate(e.target.value)}
-              hint={`${TARGET_LABEL[picked.targetGroup]} 요금제는 나이 확인이 필요해요. 한 번 확인하면 다음부터는 비워 둬도 돼요.`}
+              hint={`${TARGET_LABEL[selected.targetGroup]} 요금제는 나이 확인이 필요해요. 한 번 확인하면 다음부터는 비워 둬도 돼요.`}
             />
+          )}
+
+          {warning && (
+            <p className="m-0 flex gap-2 rounded-2xl bg-surface-2 px-3.5 py-3 text-[13px] leading-[19px] text-ink">
+              <TriangleAlert size={16} strokeWidth={2.2} aria-hidden className="mt-[1px] shrink-0 text-danger" />
+              <span>{warning}</span>
+            </p>
           )}
 
           {error && (
@@ -226,4 +275,13 @@ function PlanSelect() {
       )}
     </div>
   )
+}
+
+/** 세로로 스크롤되는 가장 가까운 상위 요소. 없으면 문서 전체 */
+function scrollParent(el: HTMLElement): Element {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const { overflowY } = getComputedStyle(p)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && p.scrollHeight > p.clientHeight) return p
+  }
+  return document.scrollingElement ?? document.documentElement
 }

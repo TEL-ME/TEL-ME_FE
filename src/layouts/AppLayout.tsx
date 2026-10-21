@@ -18,6 +18,7 @@ interface NavItem {
   badge?: ChatBadge
   /** 가운데 강조 버튼 (상담) */
   center?: boolean
+  clarityAction: string
 }
 
 /** 하단 메뉴 "상담" 표시: 보고 있지 않은 대화의 답변을 만드는 중 · 답변 도착 */
@@ -84,8 +85,8 @@ export default function AppLayout() {
   if (pathname === '/' && !hasOnboarded()) return <Navigate to="/onboarding" replace />
 
   const nav: NavItem[] = [
-    { to: '/faq', label: 'FAQ', icon: BookOpenText, match: (p) => p.startsWith('/faq') },
-    { to: '/stores', label: '매장', icon: MapIcon, match: (p) => p.startsWith('/stores') },
+    { to: '/faq', label: 'FAQ', icon: BookOpenText, match: (p) => p.startsWith('/faq'), clarityAction: 'nav_faq' },
+    { to: '/stores', label: '매장', icon: MapIcon, match: (p) => p.startsWith('/stores'), clarityAction: 'nav_stores' },
     {
       to: lastSessionId ? `/chat/${lastSessionId}` : '/',
       label: '상담',
@@ -93,9 +94,10 @@ export default function AppLayout() {
       match: (p) => p === '/' || p.startsWith('/chat'),
       badge: chatBadge,
       center: true,
+      clarityAction: 'nav_chat',
     },
-    { to: '/my', label: '마이', icon: UserRound, match: (p) => p.startsWith('/my') },
-    { to: '/settings', label: '설정', icon: Settings, match: (p) => p.startsWith('/settings') },
+    { to: '/my', label: '마이', icon: UserRound, match: (p) => p.startsWith('/my'), clarityAction: 'nav_my' },
+    { to: '/settings', label: '설정', icon: Settings, match: (p) => p.startsWith('/settings'), clarityAction: 'nav_settings' },
   ]
 
   return (
@@ -106,12 +108,13 @@ export default function AppLayout() {
       {/* 가운데 상담 버튼이 위로 튀어나와서, 매장 목록 시트(z-20)보다 위 · 위치 안내 창(z-30)·대화 목록(z-40)보다 아래 */}
       <nav aria-label="주요 메뉴" className="relative z-[25] shrink-0 bg-surface pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-[480px]">
-          {nav.map(({ to, label, icon: Icon, match, badge, center }) => {
+          {nav.map(({ to, label, icon: Icon, match, badge, center, clarityAction }) => {
             const active = match(pathname)
             return (
               <NavLink
                 key={label}
                 to={to}
+                data-clarity-action={clarityAction}
                 aria-current={active ? 'page' : undefined}
                 className={`flex flex-1 flex-col items-center gap-1 pb-3 pt-2.5 text-xs ${
                   center
@@ -127,7 +130,7 @@ export default function AppLayout() {
                   // 책 아이콘은 채우면 안의 줄이 안 보여 채우지 않는다
                   <Icon size={24} strokeWidth={1.8} fill={active && Icon !== BookOpenText ? 'currentColor' : 'none'} aria-hidden />
                 )}
-                {label}
+                <span data-clarity-unmask="true">{label}</span>
                 {badge && <span className="sr-only">, {BADGE_LABEL[badge]}</span>}
               </NavLink>
             )

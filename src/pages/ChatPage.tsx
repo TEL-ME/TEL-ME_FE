@@ -299,6 +299,8 @@ export default function ChatPage() {
                   track('consult_end_open')
                   setConfirmEnd(true)
                 }}
+                data-clarity-unmask="true"
+                data-clarity-action="consult_end_open"
                 className="pointer-events-auto flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold text-ink-sub shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-50"
               >
                 <CircleCheck size={15} strokeWidth={2} aria-hidden />
@@ -347,6 +349,7 @@ export default function ChatPage() {
       <ConfirmDialog
         open={confirmEnd}
         title="상담을 종료할까요?"
+        clarityScope="consultation-end"
         confirmLabel="종료"
         onCancel={() => setConfirmEnd(false)}
         onConfirm={() => {

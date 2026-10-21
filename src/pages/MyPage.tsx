@@ -215,6 +215,14 @@ function PlanBrief() {
                 정지 중
               </span>
             )}
+            {fee?.prorated && (
+              <span
+                title="이번 달 중간에 요금제가 바뀌어 날짜만큼 나눠 계산했어요"
+                className="rounded-md bg-surface-2 px-1.5 py-px text-[11px] font-semibold text-ink-sub"
+              >
+                일할 계산
+              </span>
+            )}
           </span>
           {fee ? (
             <>

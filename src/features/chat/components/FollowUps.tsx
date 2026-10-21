@@ -1,7 +1,8 @@
 import { ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { planTaskPath } from '../planTaskLinks'
 import { track } from '../../../lib/analytics'
+import { useAllPlans } from '../../plans/queries'
+import { parsePlanTaskLink, planTaskHref } from '../planTaskLinks'
 
 interface FollowUpsProps {
   items: string[]
@@ -14,12 +15,21 @@ interface FollowUpsProps {
 /**
  * 후속 질문 (문서 9번): 최대 3개, 누르면 바로 보낸다. 답변 생성 중에는 비활성.
  * 요금제 업무 링크(planTaskLinks)는 채팅으로 보내지 않고 처리 화면으로 이동하며, 3개 제한에 세지 않는다.
+ * 요금제 이름이 붙은 링크는 그 요금제를 고른 채로 요금제 고르기 화면을 연다.
  */
 export default function FollowUps({ items, disabled, onAsk, choices = false }: FollowUpsProps) {
   const navigate = useNavigate()
   const filled = items.filter((s) => s.trim())
-  const links = filled.filter((s) => planTaskPath(s))
-  const questions = filled.filter((s) => !planTaskPath(s))
+  const links = filled.filter((s) => parsePlanTaskLink(s))
+  const questions = filled.filter((s) => !parsePlanTaskLink(s))
+  // 요금제 이름이 붙은 링크("5G 스탠다드 변경하러 가기")가 있을 때만 요금제 목록을 읽어 planId를 찾는다
+  const plans = useAllPlans(links.some((s) => parsePlanTaskLink(s)?.planName))
+  const go = (label: string) => {
+    const link = parsePlanTaskLink(label)
+    if (!link) return
+    track('plan_link_click', { label })
+    navigate(planTaskHref(link, plans.data ?? []))
+  }
   const list = choices ? questions : questions.slice(0, 3)
   if (list.length === 0 && links.length === 0) return null
   return (
@@ -28,9 +38,7 @@ export default function FollowUps({ items, disabled, onAsk, choices = false }: F
         <button
           key={label}
           type="button"
-          onClick={() => {
-            track('plan_link_click', { label })
-            navigate(planTaskPath(label)!)}}
+          onClick={() => go(label)}
           className="inline-flex min-h-9 items-center gap-0.5 rounded-full bg-brand-soft py-1.5 pl-3.5 pr-2.5 text-sm font-bold leading-5 text-brand-strong"
         >
           {label}

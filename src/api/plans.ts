@@ -85,6 +85,8 @@ export interface ExpectedFee {
   amount: number
   previousAmount: number | null
   difference: number | null
+  /** 이번 달 중간에 요금제가 바뀌어 날짜만큼 나눠 계산했으면 true */
+  prorated?: boolean
 }
 
 /** 한 달 사용량. daysUntilBilling·paused·expectedFee는 이번 달에만 있고 지난 달은 null */

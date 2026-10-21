@@ -13,6 +13,10 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN?: string
   /** Sentry에서 구분할 환경 이름 (local / beta) */
   readonly VITE_SENTRY_ENVIRONMENT?: string
+  /** 클래리티는 명시적으로 켠 환경에서만 수집한다. 설정 변경 후 다시 빌드해야 한다. */
+  readonly VITE_CLARITY_ENABLED?: string
+  readonly VITE_CLARITY_PROJECT_ID?: string
+  readonly VITE_CLARITY_ENVIRONMENT?: 'local' | 'beta'
   /** GA4 측정 ID(G-로 시작). 비우면 사용자 행동을 수집하지 않는다 */
   readonly VITE_GA_MEASUREMENT_ID?: string
   /** true면 GA DebugView에 보이도록 debug_mode를 켠다 (로컬 확인용, 배포에서는 비움) */
