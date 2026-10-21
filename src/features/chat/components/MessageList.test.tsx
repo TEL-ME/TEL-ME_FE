@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../../../api/types'
+import { GUEST_LIMIT_MESSAGE } from '../guestLimitStore'
 import MessageList from './MessageList'
 
 const RAW = '제 번호는 010-1234-5678이에요. 요금제 바꾸고 싶어요'
@@ -66,5 +67,21 @@ describe('MessageList 보내는 중인 질문', () => {
     expect(screen.getByText('보내지 못한 질문이에요')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
     expect(screen.queryByText(RAW)).not.toBeInTheDocument()
+  })
+
+  it('게스트 하루 질문 수에 걸려 거절되면 다시 시도 없이 안내만 한다', () => {
+    wrap(
+      <MessageList
+        {...base}
+        messages={[]}
+        pendingQuestion={RAW}
+        status="failed"
+        errorMessage={GUEST_LIMIT_MESSAGE}
+        guestLimited
+      />,
+    )
+    expect(screen.getByText('비회원 질문 한도')).toBeInTheDocument()
+    expect(screen.getByText(GUEST_LIMIT_MESSAGE)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
   })
 })

@@ -3,9 +3,16 @@ import { chatApi, subscribeExecution, type ChatCoordinates } from '../../api/cha
 import { ApiError } from '../../api/client'
 import { queryClient } from '../../lib/queryClient'
 import { showToast } from '../../stores/toastStore'
+import { openLoginSheet } from '../auth/loginSheetStore'
 import type { ChatMessageHistory } from '../../api/types'
 import { clearAllUnread, notifyAnswer, outcomeOfComplete, shouldNotifyFailure } from './answerNotifier'
 import { coordsForNext, forgetCoordsExcept, rememberCoords } from './heldCoords'
+import {
+  GUEST_DAILY_LIMIT_CODE,
+  GUEST_LIMIT_LOGIN_NOTE,
+  GUEST_LIMIT_MESSAGE,
+  markGuestLimited,
+} from './guestLimitStore'
 import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
@@ -33,6 +40,8 @@ interface ChatRunState {
   /** 타자 효과로 보여 줄 답변 메시지 */
   typingMessageId: number | null
   errorMessage: string | null
+  /** 방금 질문이 게스트 하루 질문 수에 걸려 거절됐다 (CHAT429-0). 다시 시도 대신 로그인을 안내한다 */
+  guestLimited: boolean
 }
 
 const initial: ChatRunState = {
@@ -42,6 +51,7 @@ const initial: ChatRunState = {
   sentMessageId: null,
   typingMessageId: null,
   errorMessage: null,
+  guestLimited: false,
 }
 
 /**
@@ -223,7 +233,14 @@ export async function sendQuestion(
   if (!content || isBusy(get().status)) return
 
   clearInputGuardNotice()
-  set({ status: 'sending', pendingQuestion: content, sentMessageId: null, typingMessageId: null, errorMessage: null })
+  set({
+    status: 'sending',
+    pendingQuestion: content,
+    sentMessageId: null,
+    typingMessageId: null,
+    errorMessage: null,
+    guestLimited: false,
+  })
   let sessionId = get().sessionId
   try {
     if (sessionId == null) {
@@ -270,6 +287,13 @@ export async function sendQuestion(
         listen(sessionId, history.runningExecutionId)
         return
       }
+    }
+    // 같은 날 다시 보내도 또 거절되므로 입력창을 로그인 안내로 바꾸고, 이번 한 번은 로그인 시트를 바로 띄운다
+    if (error instanceof ApiError && error.code === GUEST_DAILY_LIMIT_CODE) {
+      markGuestLimited()
+      set({ status: 'failed', errorMessage: GUEST_LIMIT_MESSAGE, guestLimited: true })
+      openLoginSheet({ subtitle: GUEST_LIMIT_LOGIN_NOTE })
+      return
     }
     set({ status: 'failed', errorMessage: error instanceof ApiError ? error.message : NETWORK_MESSAGE })
   }

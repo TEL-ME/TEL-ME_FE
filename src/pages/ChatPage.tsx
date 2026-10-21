@@ -18,7 +18,9 @@ import {
 } from '../features/chat/chatRunStore'
 import ChatHeader from '../features/chat/components/ChatHeader'
 import Composer from '../features/chat/components/Composer'
+import GuestLimitPanel from '../features/chat/components/GuestLimitPanel'
 import InputGuardBanner from '../features/chat/components/InputGuardBanner'
+import { useGuestLimited } from '../features/chat/guestLimitStore'
 import { useRestrictionText } from '../features/chat/useRestrictionText'
 import HomeIntro from '../features/chat/components/HomeIntro'
 import MessageList from '../features/chat/components/MessageList'
@@ -226,6 +228,8 @@ export default function ChatPage() {
 
   // 반복 욕설로 일시 제한 중이면 입력을 막는다 (TELME-119)
   const restriction = useRestrictionText()
+  // 게스트가 오늘 질문을 모두 썼으면 입력창 자리에 로그인 안내를 둔다 (백엔드 TELME-213). 로그인하면 바로 풀린다
+  const guestLimited = useGuestLimited() && !isUser
 
   const listProps = { currentId: activeId, busy, onPick: pickSession, onNewChat: newChat }
 
@@ -274,6 +278,7 @@ export default function ChatPage() {
                 status={status}
                 typingMessageId={own ? run.typingMessageId : null}
                 errorMessage={own ? run.errorMessage : null}
+                guestLimited={own && run.guestLimited}
                 onTyped={finishTyping}
                 onAsk={ask}
                 onRetry={retry}
@@ -281,7 +286,7 @@ export default function ChatPage() {
               />
               </>
             ) : (
-              <HomeIntro disabled={busy} onAsk={ask} />
+              <HomeIntro disabled={busy || guestLimited} onAsk={ask} />
             )}
           </div>
         </main>
@@ -325,7 +330,10 @@ export default function ChatPage() {
               </button>
             </div>
           ) : (
-            !notFound && (
+            !notFound &&
+            (guestLimited ? (
+              <GuestLimitPanel />
+            ) : (
               <>
                 <InputGuardBanner />
                 <Composer
@@ -335,7 +343,7 @@ export default function ChatPage() {
                   onSend={(q) => void askTyped(q)}
                 />
               </>
-            )
+            ))
           )}
         </footer>
       </div>

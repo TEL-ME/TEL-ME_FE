@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExecutionHandlers } from '../../api/chat'
+import { ApiError } from '../../api/client'
 import type { ChatExecutionState } from '../../api/types'
+import { closeLoginSheet, useLoginSheet } from '../auth/loginSheetStore'
+import { GUEST_LIMIT_LOGIN_NOTE, GUEST_LIMIT_MESSAGE, liftGuestLimit, useGuestLimit } from './guestLimitStore'
 
 const subs: { sessionId: number; handlers: ExecutionHandlers; stop: ReturnType<typeof vi.fn> }[] = []
 
@@ -23,7 +26,14 @@ vi.mock('./answerNotifier', async (importOriginal) => ({
   notifyAnswer: vi.fn(),
 }))
 
-const { attachSession, resumeExecution, sendQuestion, stopBackgroundStreams, useBackgroundRuns, useChatRun } = await import('./chatRunStore')
+const {
+  attachSession,
+  resumeExecution,
+  sendQuestion,
+  stopBackgroundStreams,
+  useBackgroundRuns,
+  useChatRun,
+} = await import('./chatRunStore')
 const { coordsForNext, forgetCoords } = await import('./heldCoords')
 const { notifyAnswer } = await import('./answerNotifier')
 
@@ -129,5 +139,36 @@ describe('질문을 보내는 중(서버 응답 전)에 다른 대화로 옮겼�
     attachSession(2)
     attachSession(1)
     expect(coordsForNext(1, clarify)).toBeUndefined()
+  })
+})
+
+describe('게스트가 하루 질문 수를 넘겼을 때 (CHAT429-0)', () => {
+  const LIMIT_MESSAGE = '오늘 비회원으로 보낼 수 있는 질문을 모두 사용했습니다.'
+
+  beforeEach(() => {
+    attachSession(null)
+    stopBackgroundStreams()
+    closeLoginSheet()
+    liftGuestLimit()
+  })
+
+  it('다시 시도 대신 로그인을 안내하고, 한국 시간 0시까지 입력을 막고, 로그인 시트를 연다', async () => {
+    chatApi.sendMessage.mockRejectedValueOnce(new ApiError(429, 'CHAT429-0', LIMIT_MESSAGE))
+    attachSession(1)
+    await sendQuestion('유심 재발급 비용')
+
+    expect(useChatRun.getState()).toMatchObject({ status: 'failed', errorMessage: GUEST_LIMIT_MESSAGE, guestLimited: true })
+    expect(useGuestLimit.getState().limitedUntil).toBeGreaterThan(Date.now())
+    expect(useLoginSheet.getState()).toMatchObject({ open: true, subtitle: GUEST_LIMIT_LOGIN_NOTE })
+  })
+
+  it('다른 이유로 실패하면 로그인을 안내하지 않는다', async () => {
+    chatApi.sendMessage.mockRejectedValueOnce(new ApiError(503, 'COMMON503', '잠시 후 다시 시도해 주세요.'))
+    attachSession(1)
+    await sendQuestion('유심 재발급 비용')
+
+    expect(useChatRun.getState()).toMatchObject({ status: 'failed', guestLimited: false })
+    expect(useGuestLimit.getState().limitedUntil).toBeNull()
+    expect(useLoginSheet.getState().open).toBe(false)
   })
 })

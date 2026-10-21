@@ -27,6 +27,8 @@ interface MessageListProps {
   status: ChatStatus
   typingMessageId: number | null
   errorMessage: string | null
+  /** 게스트 하루 질문 수에 걸려 거절됐다. 같은 날엔 다시 시도해도 또 거절되므로 다시 시도를 빼고 안내만 한다 (로그인 버튼은 입력창 자리에 있다) */
+  guestLimited?: boolean
   onTyped: () => void
   /** coords는 "현재 위치 사용"으로 보낼 때만 있다 */
   onAsk: (question: string, coords?: ChatCoordinates) => void
@@ -66,6 +68,7 @@ export default function MessageList({
   status,
   typingMessageId,
   errorMessage,
+  guestLimited = false,
   onTyped,
   onAsk,
   onRetry,
@@ -186,9 +189,12 @@ export default function MessageList({
       )}
 
       {showSendError && pendingQuestion && (
-        <BotBubble tone="error" meta="질문을 보내지 못했어요">
+        <BotBubble
+          tone={guestLimited ? 'notice' : 'error'}
+          meta={guestLimited ? '비회원 질문 한도' : '질문을 보내지 못했어요'}
+        >
           <p className="m-0">{errorMessage ?? FALLBACK_ERROR}</p>
-          {retryButton(pendingQuestion, null)}
+          {!guestLimited && retryButton(pendingQuestion, null)}
         </BotBubble>
       )}
 

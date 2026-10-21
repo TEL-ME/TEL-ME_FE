@@ -3,6 +3,7 @@ import { authApi } from '../../api/auth'
 import type { Me } from '../../api/types'
 import { queryClient } from '../../lib/queryClient'
 import { attachSession, stopBackgroundStreams } from '../chat/chatRunStore'
+import { liftGuestLimit } from '../chat/guestLimitStore'
 import { liftRestriction } from '../chat/inputGuardStore'
 
 export const meKey = ['auth', 'me'] as const
@@ -16,8 +17,9 @@ export function useMe() {
 
 /** 로그인·가입 직후: 게스트 대화가 계정으로 옮겨지므로 대화 관련 캐시를 새로 읽는다 */
 export async function afterLogin() {
-  // 일시 제한은 사용자(게스트/회원)별이라 계정이 바뀌면 화면 제한을 풀고 서버 판단을 따른다
+  // 일시 제한·게스트 하루 질문 수는 사용자(게스트/회원)별이라 계정이 바뀌면 화면 제한을 풀고 서버 판단을 따른다
   liftRestriction()
+  liftGuestLimit()
   // 화면에 useMe가 없어도(콜백 화면 등) 다음 화면이 새 로그인 수단을 바로 보도록 기다렸다가 넘어간다
   await queryClient.fetchQuery({ queryKey: meKey, queryFn: authApi.me, staleTime: 0 }).catch(() => undefined)
   await queryClient.invalidateQueries({ queryKey: ['chat'] })
@@ -31,6 +33,7 @@ export async function logout() {
     attachSession(null)
     stopBackgroundStreams()
     liftRestriction()
+    liftGuestLimit()
     queryClient.removeQueries({ queryKey: ['chat'] })
     queryClient.setQueryData(meKey, GUEST)
     await queryClient.invalidateQueries({ queryKey: meKey })
