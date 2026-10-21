@@ -1,5 +1,3 @@
-import { hasOnboarded } from '../features/onboarding/onboardingFlag'
-
 type Gtag = (...args: unknown[]) => void
 
 declare global {
@@ -10,6 +8,7 @@ declare global {
 }
 
 const SCRIPT_ID = 'telme-ga'
+const ONBOARDING_KEY = 'telme-onboarded'
 
 /** 보낼 수 있는 이벤트. 새 이벤트는 여기에 먼저 추가한다 */
 export type AnalyticsEvent =
@@ -32,8 +31,15 @@ function measurementId(): string | null {
   return id && /^G-[A-Z0-9]+$/.test(id) ? id : null
 }
 
-/** 관리자 화면은 수집하지 않는다 */
-const isAdminPath = (path: string) => path === '/admin' || path.startsWith('/admin/') || path.startsWith('/admin?')
+/** Clarity(canRecordClarity)와 같은 기준: 관리자·온보딩 화면 제외, 온보딩을 마친 기기만 */
+function canTrack(path: string): boolean {
+  try {
+    const pathname = decodeURIComponent(path.split('?')[0]).replace(/\/{2,}/g, '/')
+    return !/^\/(admin|onboarding)(\/|$)/i.test(pathname) && localStorage.getItem(ONBOARDING_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 /**
  * GA4 사용자 행동 수집
@@ -67,14 +73,14 @@ export function initAnalytics(): boolean {
 }
 
 /**
- * 화면이 바뀔 때마다 부른다.
+ * 화면이 바뀔 때마다 부른다. 수집 기준은 canTrack (Clarity와 같음)
  * - 온보딩(이용약관·개인정보처리방침 동의)을 마친 기기에서만 수집한다
- * - 관리자 화면(/admin)은 수집하지 않는다. 그동안 gtag.js가 아무것도 보내지 않게 막는다
+ * - 관리자(/admin)·온보딩(/onboarding) 화면은 수집하지 않는다. 그동안 gtag.js가 아무것도 보내지 않게 막는다
  */
 export function syncAnalytics(path: string) {
   const id = measurementId()
   if (!id) return
-  const off = isAdminPath(path) || !hasOnboarded()
+  const off = !canTrack(path)
   ;(window as unknown as Record<string, unknown>)[`ga-disable-${id}`] = off
   if (off || !initAnalytics()) return
   window.gtag?.('event', 'page_view', { page_location: window.location.origin + path, page_title: document.title })

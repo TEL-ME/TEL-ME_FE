@@ -78,4 +78,15 @@ describe('GA 연결', () => {
     expect(disabled()).toBe(false)
     expect(pageViews()).toHaveLength(2)
   })
+
+  it('온보딩 화면과 주소 모양이 다른 관리자 화면도 수집하지 않는다 (Clarity와 같은 기준)', () => {
+      vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TEST123')
+      localStorage.setItem('telme-onboarded', '1')
+
+      syncAnalytics('/onboarding')
+      syncAnalytics('/ADMIN')
+      syncAnalytics('//admin/dashboard')
+      expect(document.querySelector(SCRIPT)).toBeNull()
+      expect(pageViews()).toHaveLength(0)
+    })
 })
