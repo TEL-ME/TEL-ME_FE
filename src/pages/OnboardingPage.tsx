@@ -25,8 +25,9 @@ function Terms() {
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
-  // 설정 → 시작하기 다시 보기로 들어온 로그인 사용자는 로그인 상태 그대로 둔다
-  const { isUser } = useMe()
+  // 설정 → 시작하기 다시 보기로 들어온 로그인 사용자는 로그인 상태 그대로 둔다.
+  // 다른 탭에서 로그인했을 수 있어 들어올 때 서버에 다시 묻고, 답이 오기 전에는 고르는 버튼을 보여 주지 않는다
+  const { isUser, isChecking } = useMe({ recheck: true })
   // 끝내기: 다시 안 보이게 표시하고, 상담 홈으로 넘어가는 화면(/intro)을 보여 준다
   const finish = (toast = '') => {
     markOnboarded()
@@ -68,7 +69,9 @@ export default function OnboardingPage() {
           ))}
         </div>
 
-        {last && isUser ? (
+        {last && isChecking ? (
+          <div aria-busy="true" aria-label="로그인 상태 확인 중" className="min-h-[52px]" />
+        ) : last && isUser ? (
           <div className="flex flex-col gap-2">
             <p className="text-center text-sm font-semibold text-success">이미 로그인돼 있어요. 상담 기록이 계정에 저장되고 있어요.</p>
             <button
