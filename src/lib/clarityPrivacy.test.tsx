@@ -1,26 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ConfirmDialog from '../components/ConfirmDialog'
-import EndSummaryCard from '../features/chat/components/EndSummaryCard'
-
-vi.mock('../features/chat/endSummaryQueries', () => ({
-    useEndSummary: () => ({
-        isPending: false,
-        isError: false,
-        isFetching: false,
-        data: {
-            summaryStatus: 'COMPLETED',
-            generatedAt: null,
-            summary: {
-                topics: [],
-                guidance: [],
-                pendingItems: [],
-                inquiries: [{ title: '합성 고객 문의', text: '합성 이메일 beta@example.invalid 문의의 안내입니다.' }],
-                remaining: [],
-            },
-        },
-    }),
-}))
 
 afterEach(() => {
     vi.unstubAllGlobals()
@@ -48,27 +28,4 @@ describe('고정 버튼의 가림 예외', () => {
         expect(screen.getByRole('button', { name: '합성 고객 삭제' })).not.toHaveAttribute('data-clarity-action')
     })
 
-    it('대역 응답의 요약 본문은 가리고 펼치기·접기의 고정 버튼만 보이게 한다', () => {
-        // 화면 높이 측정만 대체한다. 외부 기록 서버와 실제 상담 모델은 호출하지 않는다.
-        vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(220)
-        vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(66)
-        vi.stubGlobal('ResizeObserver', class {
-            private callback: () => void
-            constructor(callback: () => void) { this.callback = callback }
-            observe() { this.callback() }
-            disconnect() {}
-        })
-        render(<EndSummaryCard sessionId={1} />)
-        expect(screen.getByRole('region', { name: '상담 요약' })).toHaveAttribute('data-clarity-mask', 'true')
-        expect(screen.getByText('합성 이메일 beta@example.invalid 문의의 안내입니다.')
-            .closest('[data-clarity-unmask]')).toBeNull()
-        const expand = screen.getByRole('button', { name: '더 보기' })
-        expect(expand).toHaveAttribute('data-clarity-unmask', 'true')
-        expect(expand).toHaveAttribute('data-clarity-action', 'summary_expand')
-        fireEvent.click(expand)
-        const collapse = screen.getByRole('button', { name: '접기' })
-        expect(collapse).toHaveAttribute('data-clarity-action', 'summary_collapse')
-        fireEvent.click(collapse)
-        expect(screen.getByRole('button', { name: '더 보기' })).toHaveAttribute('aria-expanded', 'false')
-    })
 })

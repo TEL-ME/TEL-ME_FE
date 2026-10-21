@@ -127,45 +127,6 @@ export interface ChatSource {
   score: number
 }
 
-/**
- * 상담 종료 요약 (GET /chat/sessions/{id}/summary, TELME-142)
- * 종료 API가 성공해도 요약은 비동기로 만들어진다. PENDING·GENERATING이면 다시 조회한다
- */
-export type EndSummaryStatus = 'NOT_REQUESTED' | 'PENDING' | 'GENERATING' | 'COMPLETED' | 'EMPTY' | 'FAILED'
-
-export interface EndSummaryInquiry {
-  title: string
-  text: string
-}
-
-/** NEEDS_CONFIRMATION: 되물었는데 답을 받지 못함 · UNANSWERED: 근거 있는 답변을 못 받음 */
-export interface EndSummaryRemaining {
-  title: string
-  text: string
-  kind: 'NEEDS_CONFIRMATION' | 'UNANSWERED' | (string & {})
-}
-
-export interface ChatEndSummary {
-  sessionId: number
-  sessionStatus: SessionStatus
-  summaryStatus: EndSummaryStatus
-  /** COMPLETED에서만 있다 */
-  summary: {
-    /** 주요 문의 */
-    topics: string[]
-    /** 안내받은 내용 (실제 답변의 원문 발췌. "안내받은 내용: "으로 시작할 수 있다) */
-    guidance: string[]
-    /** 남은 사항. 개수 상한을 가정하지 않는다 */
-    pendingItems: string[]
-    /** 문의별 답변 (TELME-170). 같은 제목이 여러 번 올 수 있어 화면에서 묶는다. 예전 요약은 빈 목록 */
-    inquiries?: EndSummaryInquiry[]
-    /** 남은 사항에 문의 제목·종류를 붙인 것 (TELME-170). 예전 요약은 빈 목록 */
-    remaining?: EndSummaryRemaining[]
-  } | null
-  generatedAt: string | null
-  message: string | null
-}
-
 export interface ChatSources {
   messageId: number
   sources: ChatSource[]

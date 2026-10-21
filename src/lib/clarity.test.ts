@@ -61,10 +61,10 @@ describe('클래리티 연결과 전송 범위', () => {
     it('버튼 안쪽 요소를 눌러도 동작 이름만 보내고 합성 개인정보는 보내지 않는다', () => {
         initClarity()
         document.body.insertAdjacentHTML('beforeend', `
-            <button data-clarity-action="summary_expand"><span>합성 고객 beta@example.invalid</span></button>
+            <button data-clarity-action="consult_end_open"><span>합성 고객 beta@example.invalid</span></button>
         `)
         document.querySelector('button span')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        expect(window.clarity?.q?.at(-1)).toEqual(['event', 'summary_expand'])
+        expect(window.clarity?.q?.at(-1)).toEqual(['event', 'consult_end_open'])
         expect(JSON.stringify(window.clarity?.q)).not.toContain('beta@example.invalid')
     })
 
@@ -77,6 +77,15 @@ describe('클래리티 연결과 전송 범위', () => {
         document.querySelectorAll('button').forEach((button) => {
             button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
+        expect(window.clarity?.q).toEqual([['set', 'environment', 'local']])
+    })
+
+    it.each(['summary_expand', 'summary_collapse'])('삭제된 요약 화면의 동작은 기록하지 않는다: %s', (action) => {
+        initClarity()
+        const button = document.createElement('button')
+        button.setAttribute('data-clarity-action', action)
+        document.body.appendChild(button)
+        button.click()
         expect(window.clarity?.q).toEqual([['set', 'environment', 'local']])
     })
 })

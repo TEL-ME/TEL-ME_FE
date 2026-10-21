@@ -11,8 +11,6 @@ const ACTIONS = new Set([
     'consult_end_open',
     'consult_end_confirm',
     'consult_end_cancel',
-    'summary_expand',
-    'summary_collapse',
     'chat_list_open',
     'chat_new',
     'nav_faq',

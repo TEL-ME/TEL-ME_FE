@@ -1,6 +1,5 @@
 import { api, apiUrl } from './client'
 import type {
-  ChatEndSummary,
   ChatExecutionState,
   ChatFailure,
   ChatMessageHistory,
@@ -63,11 +62,9 @@ export const chatApi = {
   updateTitle: (sessionId: number, title: string) =>
     api<ChatSession>(`${BASE}/sessions/${sessionId}/title`, { method: 'PATCH', body: { title } }),
 
-  /** 종료한다. 성공해도 요약이 끝난 것은 아니다 (getSummary로 따로 확인) */
+  /** 종료한다. 기록은 남고 더 질문할 수 없다 */
   closeSession: (sessionId: number) => api<ChatSession>(`${BASE}/sessions/${sessionId}/close`, { method: 'PATCH' }),
 
-  /** 상담 종료 요약 상태·결과. 조회만 하고 생성·재시도는 하지 않는다 (새로고침 후에도 같은 API로 다시 읽는다) */
-  getSummary: (sessionId: number) => api<ChatEndSummary>(`${BASE}/sessions/${sessionId}/summary`),
 
   getSources: (messageId: number) => api<ChatSources>(`${BASE}/messages/${messageId}/sources`),
 }

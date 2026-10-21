@@ -1,5 +1,5 @@
 import { RotateCw } from 'lucide-react'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect } from 'react'
 import type { ChatCoordinates } from '../../../api/chat'
 import type { ChatMessage } from '../../../api/types'
 import FeedbackButtons from '../../feedback/FeedbackButtons'
@@ -34,8 +34,6 @@ interface MessageListProps {
   closed?: boolean
   /** failedMessageId가 null이면 질문이 서버에 저장되기 전에 실패한 경우 */
   onRetry: (question: string, failedMessageId: number | null) => void
-  /** 대화 맨 아래에 붙는 내용 (종료된 대화의 상담 요약) */
-  footer?: ReactNode
 }
 
 const FAIL_STATUSES = new Set(['FAILED', 'TIMEOUT', 'CANCELLED'])
@@ -72,7 +70,6 @@ export default function MessageList({
   onAsk,
   onRetry,
   closed = false,
-  footer,
 }: MessageListProps) {
   const busy = isBusy(status)
   // 대화를 바꾸거나 화면을 떠나면 듣던 답변을 멈춘다
@@ -195,7 +192,6 @@ export default function MessageList({
         </BotBubble>
       )}
 
-      {footer}
     </div>
   )
 }
