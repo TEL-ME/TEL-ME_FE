@@ -296,8 +296,9 @@ export default function ChatPage() {
                 type="button"
                 disabled={busy || ending}
                 onClick={() => {
-                    track('consult_end_open')
-                    setConfirmEnd(true)}}
+                  track('consult_end_open')
+                  setConfirmEnd(true)
+                }}
                 className="pointer-events-auto flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold text-ink-sub shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-50"
               >
                 <CircleCheck size={15} strokeWidth={2} aria-hidden />
@@ -349,8 +350,9 @@ export default function ChatPage() {
         confirmLabel="종료"
         onCancel={() => setConfirmEnd(false)}
         onConfirm={() => {
-            track('consult_end_confirm')
-            void endConsult()}}
+          track('consult_end_confirm')
+          void endConsult()
+        }}
       >
         종료하면 이 대화에는 더 질문할 수 없어요. 기록은 계속 볼 수 있어요.
       </ConfirmDialog>

@@ -62,7 +62,8 @@ export default function SourceList({ messageId, trailing }: { messageId: number;
           aria-controls={listId}
           onClick={() => {
             if (!open) track('faq_source_open')
-            setOpen((v) => !v)}}
+            setOpen((v) => !v)
+          }}
           className="flex items-center gap-1.5 text-[13px] font-semibold leading-[18px] text-ink-sub"
         >
           참고한 정보 {sources.length}개
