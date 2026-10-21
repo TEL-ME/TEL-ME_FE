@@ -59,7 +59,8 @@ function PlanSelect() {
   const [params] = useSearchParams()
   const presetId = Number(params.get('planId')) || null
   const [touched, setTouched] = useState(false)
-  const presetRef = useRef<HTMLLIElement>(null)
+  const selectedRef = useRef<HTMLLIElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
   // 변경할 때 이번 달 사용량이 고른 요금제 한도를 넘는지 보여 주려고 읽는다
   const usage = useUsage(null)
   const [contract, setContract] = useState(false)
@@ -77,11 +78,26 @@ function PlanSelect() {
       : null
   const selected = picked ?? preset
 
-  // 미리 고른 요금제가 목록 아래쪽에 있어도 보이게 한다
-  const presetShown = preset != null && !sub.isPending
+  // 변경 확인 단계: 이번 달 사용량이 고른 요금제 한도를 넘으면 알린다 (변경은 막지 않는다)
+  const monthUsage = usage.data?.status === 'ACTIVE' ? usage.data.usage : null
+  const warning = changing && selected && monthUsage ? exceededWarning(monthUsage, selected) : null
+
+  // 고른 요금제 카드가 아래 고정 시트에 가려지면, 가려진 만큼 목록을 올린다
+  // (채팅 링크로 미리 고른 요금제가 목록 아래쪽에 있을 때도 같은 방법으로 보여 준다).
+  // 시트는 sticky라 scrollIntoView로는 가림을 알 수 없어 화면 위치로 직접 계산한다. 경고가 늦게 붙어 시트가 커지면 다시 맞춘다
+  const selectedId = sub.isPending ? null : (selected?.planId ?? null)
+  const hasWarning = warning != null
   useEffect(() => {
-    if (presetShown) presetRef.current?.scrollIntoView?.({ block: 'center' })
-  }, [presetShown])
+    if (selectedId == null) return
+    const frame = requestAnimationFrame(() => {
+      const card = selectedRef.current
+      const sheet = sheetRef.current
+      if (!card || !sheet) return
+      const hidden = card.getBoundingClientRect().bottom + 12 - sheet.getBoundingClientRect().top
+      if (hidden > 0) scrollParent(card).scrollBy?.({ top: hidden, behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selectedId, hasWarning])
 
   if (sub.isPending) return <p className="tm-pulse px-5 py-10 text-center text-sm text-ink-sub">불러오는 중…</p>
 
@@ -125,9 +141,6 @@ function PlanSelect() {
     }
   }
 
-  // 변경 확인 단계: 이번 달 사용량이 고른 요금제 한도를 넘으면 알린다 (변경은 막지 않는다)
-  const monthUsage = usage.data?.status === 'ACTIVE' ? usage.data.usage : null
-  const warning = changing && selected && monthUsage ? exceededWarning(monthUsage, selected) : null
 
   return (
     <div className="flex flex-1 flex-col">
@@ -164,7 +177,7 @@ function PlanSelect() {
               const isCurrent = changing && plan.planId === currentPlanId
               const on = selected?.planId === plan.planId
               return (
-                <li key={plan.planId} ref={preset?.planId === plan.planId ? presetRef : undefined}>
+                <li key={plan.planId} ref={on ? selectedRef : undefined}>
                   <button
                     type="button"
                     role="radio"
@@ -192,7 +205,7 @@ function PlanSelect() {
       </div>
 
       {selected && (
-        <div className="sticky bottom-0 z-[2] flex flex-col gap-3 rounded-t-[26px] bg-surface px-4 pb-4 pt-4 shadow-[0_-6px_20px_rgba(0,0,0,0.08)]">
+        <div ref={sheetRef} className="sticky bottom-0 z-[2] flex flex-col gap-3 rounded-t-[26px] bg-surface px-4 pb-4 pt-4 shadow-[0_-6px_20px_rgba(0,0,0,0.08)]">
           <div className="flex items-baseline justify-between gap-3">
             <strong className="min-w-0 truncate text-[15px] font-extrabold">{selected.name}</strong>
             <span className="shrink-0 text-[15px] font-extrabold">
@@ -262,4 +275,13 @@ function PlanSelect() {
       )}
     </div>
   )
+}
+
+/** 세로로 스크롤되는 가장 가까운 상위 요소. 없으면 문서 전체 */
+function scrollParent(el: HTMLElement): Element {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const { overflowY } = getComputedStyle(p)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && p.scrollHeight > p.clientHeight) return p
+  }
+  return document.scrollingElement ?? document.documentElement
 }
