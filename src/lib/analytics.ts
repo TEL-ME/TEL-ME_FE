@@ -1,3 +1,5 @@
+import { hasOnboarded } from '../features/onboarding/onboardingFlag'
+
 type Gtag = (...args: unknown[]) => void
 
 declare global {
@@ -19,20 +21,29 @@ export type AnalyticsEvent =
   | 'consult_end_confirm'
   | 'consult_end_success'
   | 'login'
+  | 'sign_up'
   | 'logout'
 
 /** 고정 문구·코드값만 넣는다. 질문·답변 원문, 좌표, 이메일·이름은 넣지 않는다 */
 type AnalyticsParams = Record<string, string | number>
 
+function measurementId(): string | null {
+  const id = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim()
+  return id && /^G-[A-Z0-9]+$/.test(id) ? id : null
+}
+
+/** 관리자 화면은 수집하지 않는다 */
+const isAdminPath = (path: string) => path === '/admin' || path.startsWith('/admin/') || path.startsWith('/admin?')
+
 /**
  * GA4 사용자 행동 수집
  * - VITE_GA_MEASUREMENT_ID가 비었거나 형식이 다르면 아무것도 하지 않는다
- * - 화면 이동(page_view)은 GA 향상된 측정이 보낸다 (브라우저 기록 기반 페이지 변경)
+ * - 화면 조회(page_view)는 GA 자동 전송을 끄고 syncAnalytics가 직접 보낸다 (관리자 화면을 빼기 위해)
  * - VITE_GA_DEBUG=true일 때만 DebugView에 보이도록 debug_mode를 켠다
  */
 export function initAnalytics(): boolean {
-  const id = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim()
-  if (!id || !/^G-[A-Z0-9]+$/.test(id)) return false
+  const id = measurementId()
+  if (!id) return false
   if (document.getElementById(SCRIPT_ID)) return true
 
   const dataLayer = (window.dataLayer ??= [])
@@ -42,7 +53,10 @@ export function initAnalytics(): boolean {
     dataLayer.push(arguments)
   }
   window.gtag('js', new Date())
-  window.gtag('config', id, import.meta.env.VITE_GA_DEBUG === 'true' ? { debug_mode: true } : {})
+  window.gtag('config', id, {
+    send_page_view: false,
+    ...(import.meta.env.VITE_GA_DEBUG === 'true' ? { debug_mode: true } : {}),
+  })
 
   const script = document.createElement('script')
   script.id = SCRIPT_ID
@@ -50,6 +64,20 @@ export function initAnalytics(): boolean {
   script.src = `https://www.googletagmanager.com/gtag/js?id=${id}`
   document.head.appendChild(script)
   return true
+}
+
+/**
+ * 화면이 바뀔 때마다 부른다.
+ * - 온보딩(이용약관·개인정보처리방침 동의)을 마친 기기에서만 수집한다
+ * - 관리자 화면(/admin)은 수집하지 않는다. 그동안 gtag.js가 아무것도 보내지 않게 막는다
+ */
+export function syncAnalytics(path: string) {
+  const id = measurementId()
+  if (!id) return
+  const off = isAdminPath(path) || !hasOnboarded()
+  ;(window as unknown as Record<string, unknown>)[`ga-disable-${id}`] = off
+  if (off || !initAnalytics()) return
+  window.gtag?.('event', 'page_view', { page_location: window.location.origin + path, page_title: document.title })
 }
 
 /** GA가 꺼져 있으면(측정 ID 없음, 테스트 실행) 아무것도 하지 않는다 */
