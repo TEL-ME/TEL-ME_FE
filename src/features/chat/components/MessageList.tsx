@@ -12,7 +12,7 @@ import FollowUps from './FollowUps'
 import LocationAskChips from './LocationAskChips'
 import SourceList from './SourceList'
 import StoreResults from './StoreResults'
-import { foldRetried } from '../foldRetried'
+import { foldRetried, isFailed } from '../foldRetried'
 import { isLocationAsk } from '../storeAsk'
 import ThinkingDots from './ThinkingDots'
 
@@ -90,15 +90,22 @@ export default function MessageList({
   const busy = isBusy(status)
   // 대화를 바꾸거나 화면을 떠나면 듣던 답변을 멈춘다
   useEffect(() => () => stopSpeech(), [sessionId])
-  const sorted = foldRetried(
+  const folded = foldRetried(
     [...messages].sort((a, b) => a.sequenceNo - b.sequenceNo),
     pendingQuestion,
   )
-  const last = sorted[sorted.length - 1]
+  const foldedLast = folded[folded.length - 1]
   // 저장된 질문이 목록에 오면 대기 말풍선을 내린다. 서버가 내용을 가렸을 수 있어 글자가 아니라 번호로 찾는다
-  const sentArrived = sentMessageId != null && sorted.some((m) => m.messageId === sentMessageId)
+  const sentArrived = sentMessageId != null && folded.some((m) => m.messageId === sentMessageId)
   const showPending =
-    pendingQuestion != null && !sentArrived && !(last?.role === 'USER' && last.content === pendingQuestion)
+    pendingQuestion != null &&
+    !sentArrived &&
+    !(foldedLast?.role === 'USER' && foldedLast.content === pendingQuestion)
+  // "다시 시도"를 누른 뒤 새 답변이 목록에 오기 전: 실패 말풍선 자리에 대기 말풍선 하나만 보인다
+  const retryingFailed =
+    (status === 'sending' || status === 'thinking') && !showPending && foldedLast != null && isFailed(foldedLast)
+  const sorted = retryingFailed ? folded.slice(0, -1) : folded
+  const last = sorted[sorted.length - 1]
   const lastIsGenerating = last?.role === 'ASSISTANT' && last.status === 'GENERATING'
   const showThinking = (status === 'sending' || status === 'thinking') && !lastIsGenerating
   // 질문이 서버에 저장되기 전에 실패한 경우 (세션 생성·전송 실패)

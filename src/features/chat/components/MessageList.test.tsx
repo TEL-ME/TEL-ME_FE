@@ -128,4 +128,11 @@ describe('MessageList 실패한 답변 다시 시도 (TELME-219)', () => {
     wrap(<MessageList {...base} messages={[userMessage(1, '유심 재발급')]} pendingQuestion={null} status="thinking" retrying />)
     expect(screen.getByText('답변 생성이 지연돼 다시 시도하고 있어요')).toBeInTheDocument()
   })
+
+  it('다시 시도하는 동안에는 실패 말풍선 대신 대기 말풍선 하나만 보인다', () => {
+    wrap(<MessageList {...base} messages={list} pendingQuestion={null} status="thinking" retrying />)
+    expect(screen.queryByText('답변을 받지 못했어요')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByText('답변 생성이 지연돼 다시 시도하고 있어요')).toBeInTheDocument()
+  })
 })
