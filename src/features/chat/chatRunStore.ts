@@ -19,6 +19,7 @@ import {
 } from './guestLimitStore'
 import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
+import { clearAllRetryCoords, clearRetryCoords, retryCoordsFor, saveRetryCoords } from './retryCoords'
 import { sessionsKey } from './sessionQueries'
 import { track } from '../../lib/analytics'
 
@@ -47,6 +48,8 @@ interface ChatRunState {
   errorMessage: string | null
   /** 방금 질문이 게스트 하루 질문 수에 걸려 거절됐다 (CHAT429-0). 다시 시도 대신 로그인을 안내한다 */
   guestLimited: boolean
+  /** 모델 호출이 실패해 서버가 자동으로 다시 시도하는 중 (SSE status: RETRYING). 답변이 끝나면 내린다 */
+  retrying: boolean
 }
 
 const initial: ChatRunState = {
@@ -57,6 +60,7 @@ const initial: ChatRunState = {
   typingMessageId: null,
   errorMessage: null,
   guestLimited: false,
+  retrying: false,
 }
 
 /**
@@ -77,8 +81,11 @@ const background = new Map<number, () => void>()
 /** 백그라운드에서 답변을 만드는 중인 대화. 하단 메뉴 "상담"에 생성 중 표시를 한다 */
 export const useBackgroundRuns = create<{ ids: number[] }>(() => ({ ids: [] }))
 const syncBackground = () => useBackgroundRuns.setState({ ids: [...background.keys()] })
-/** 현재 위치와 함께 보낸 마지막 질문. "다시 시도"로 같은 질문을 다시 보낼 때만 위치를 다시 붙인다 */
-let lastLocated: { content: string; coords: ChatCoordinates } | null = null
+/**
+ * 현재 위치와 함께 보낸 마지막 질문과 그 실행. "다시 시도"할 때만 위치를 다시 붙인다
+ * (서버가 좌표를 저장하지 않음). 질문이 저장되기 전이면 executionId가 없다
+ */
+let lastLocated: { content: string; coords: ChatCoordinates; executionId: number | null } | null = null
 /** 질문을 보내는 중(서버 응답 전)인 대화 */
 let sendingSessionId: number | null = null
 let reconnectTries = 0
@@ -152,6 +159,7 @@ export function stopBackgroundStreams() {
   background.clear()
   syncBackground()
   clearAllUnread()
+  clearAllRetryCoords()
 }
 
 /** 백그라운드로 넘어간 구독이 끝났으면 true (목록을 새로 읽고 알린 뒤) */
@@ -167,7 +175,7 @@ function finishInBackground(sessionId: number, notify: () => void): boolean {
 /** 답변 생성 SSE를 구독한다. 새로고침 후 runningExecutionId로 다시 붙을 때도 쓴다 */
 function listen(sessionId: number, executionId: number) {
   closeStream()
-  set({ status: 'thinking', errorMessage: null })
+  set({ status: 'thinking', errorMessage: null, retrying: false })
   stopStream = subscribe(sessionId, executionId)
 }
 
@@ -186,6 +194,7 @@ function subscribe(sessionId: number, executionId: number) {
   return subscribeExecution(sessionId, executionId, {
     onComplete: async (state) => {
       reconnectTries = 0
+      clearRetryCoords(sessionId, executionId)
       const notify = () => void notifyAnswer(sessionId, outcomeOfComplete(state), state.outputMessage?.messageId ?? null)
       if (finishInBackground(sessionId, notify)) return
       stopStream = null
@@ -193,10 +202,12 @@ function subscribe(sessionId: number, executionId: number) {
       notify()
       await refreshMessages(sessionId)
       const messageId = state.outputMessage?.messageId ?? null
-      set({ pendingQuestion: null, typingMessageId: messageId, status: messageId ? 'streaming' : 'completed' })
+      set({ pendingQuestion: null, typingMessageId: messageId, status: messageId ? 'streaming' : 'completed', retrying: false })
     },
     onError: async (failure) => {
       reconnectTries = 0
+      // 다시 시도할 수 없는 실패면 좌표도 더 필요 없다
+      if (!failure.retryable) clearRetryCoords(sessionId, executionId)
       refreshGuestLimitAfterFailure()
       const notify = () => {
         if (shouldNotifyFailure(failure)) void notifyAnswer(sessionId, 'failed')
@@ -206,13 +217,19 @@ function subscribe(sessionId: number, executionId: number) {
       if (get().sessionId !== sessionId) return
       notify()
       await refreshMessages(sessionId)
-      set({ pendingQuestion: null, status: 'failed', errorMessage: failure.message })
+      set({ pendingQuestion: null, status: 'failed', errorMessage: failure.message, retrying: false })
+    },
+    onStatus: (status) => {
+      // 백그라운드 구독이거나 다른 대화를 보고 있으면 화면에 띄울 곳이 없다
+      if (status !== 'RETRYING' || background.has(sessionId) || get().sessionId !== sessionId) return
+      set({ retrying: true })
     },
     onDisconnect: async () => {
       // 백그라운드에서 끊기면 결과를 알 수 없으니 알리지 않는다. 그 대화를 다시 열면 runningExecutionId로 이어 받는다
       if (finishInBackground(sessionId, () => {})) return
       stopStream = null
       if (get().sessionId !== sessionId) return
+      set({ retrying: false })
       // 연결만 끊긴 경우: 다시 읽어서 아직 만드는 중이면 다시 붙는다
       try {
         const history = await queryClient.fetchQuery({
@@ -291,11 +308,13 @@ export async function sendQuestion(
     let sendCoords = coords
     if (coords) rememberCoords(sessionId, coords)
     else sendCoords = coordsForNext(sessionId, queryClient.getQueryData<ChatMessageHistory>(messagesKey(sessionId))?.messages)
-    lastLocated = sendCoords ? { content, coords: sendCoords } : null
+    lastLocated = sendCoords ? { content, coords: sendCoords, executionId: null } : null
     const sent = await chatApi.sendMessage(sessionId, content, sendCoords).finally(() => {
       sendingSessionId = null
     })
     track('question_send')
+    if (lastLocated?.content === content) lastLocated.executionId = sent.executionId ?? null
+    if (sendCoords && sent.executionId != null) saveRetryCoords(sessionId, sent.executionId, sendCoords)
     applyGuestRemaining(sent.guestQuestionsRemaining)
     moveToCreated()
     if (get().sessionId !== sessionId) {
@@ -352,40 +371,62 @@ export function settle() {
   if (get().status === 'completed') set({ status: 'idle' })
 }
 
-const RETRY_API_ENABLED = import.meta.env.VITE_RETRY_API === 'true'
-
 /**
- * 실패한 답변 다시 시도 (문서 4. 생성 실패와 재시도)
- * - 전용 재시도 API가 켜져 있으면: 같은 질문에 새 실행만 붙인다
- * - 아직 없으면: 같은 질문을 다시 보낸다 (화면에서는 실패한 질문·답 한 쌍을 접어서 한 번만 보인다)
- * - 질문이 서버에 저장되기 전에 실패했다면(failedMessageId 없음) 처음부터 다시 보낸다
+ * 실패한 답변 다시 시도 (문서 4. 생성 실패와 재시도, TELME-219)
+ * - 일시적인 생성 실패(retryableExecutionId 있음): 재시도 API로 같은 질문에 새 실행만 붙인다.
+ *   질문 말풍선은 새로 생기지 않고, 새 답변이 오면 실패 말풍선은 목록에서 접힌다 (foldRetried).
+ *   게스트 하루 질문 수에 세지 않으므로 한도에 걸린 게스트도 막지 않는다
+ * - 질문이 서버에 저장되기 전에 실패했다면(retryableExecutionId 없음) 처음부터 다시 보낸다
  */
 export async function retryAnswer(
   question: string,
-  failedMessageId: number | null,
+  retryableExecutionId: number | null,
   onSessionCreated?: (sessionId: number) => void,
 ) {
   if (isBusy(get().status)) return
   const sessionId = get().sessionId
-  if (!RETRY_API_ENABLED || sessionId == null || failedMessageId == null) {
-    const coords = lastLocated?.content === question.trim() ? lastLocated.coords : undefined
+  const content = question.trim()
+  if (sessionId == null || retryableExecutionId == null) {
+    const coords = lastLocated?.content === content ? lastLocated.coords : undefined
     return sendQuestion(question, onSessionCreated, coords)
   }
-  if (isGuestLocked()) {
-    openLoginSheet({ subtitle: GUEST_LIMIT_LOGIN_NOTE })
-    return
-  }
-  set({ status: 'sending', typingMessageId: null, errorMessage: null })
+  const located =
+    lastLocated && (lastLocated.executionId === retryableExecutionId || lastLocated.content === content)
+      ? lastLocated
+      : null
+  set({ status: 'sending', typingMessageId: null, errorMessage: null, retrying: false })
   try {
-    const sent = await chatApi.retryMessage(sessionId, failedMessageId)
+    // 실행별로 보관한 좌표를 먼저 쓰고(새로고침·대화 이동 뒤에도 남아 있다), 저장할 수 없던 환경이면 메모리 값을 쓴다
+    const coords = retryCoordsFor(sessionId, retryableExecutionId) ?? located?.coords
+    const sent = await chatApi.retryExecution(sessionId, retryableExecutionId, coords)
+    // 다시 시도는 질문당 한 번이라 접수되면 그 실행의 좌표는 더 필요 없다 (다른 대화 것은 남긴다)
+    clearRetryCoords(sessionId, retryableExecutionId)
     applyGuestRemaining(sent.guestQuestionsRemaining)
-    if (get().sessionId !== sessionId) return
+    if (located) located.executionId = sent.executionId ?? null
+    if (get().sessionId !== sessionId) {
+      void refreshMessages(sessionId)
+      if (sent.executionId != null) listenInBackground(sessionId, sent.executionId)
+      return
+    }
     await refreshMessages(sessionId)
     if (sent.executionId == null) return set({ status: 'idle' })
     listen(sessionId, sent.executionId)
   } catch (error) {
     if (get().sessionId !== sessionId) return
-    if (isGuestLimitError(error)) return rejectByGuestLimit()
+    if (error instanceof ApiError) {
+      // 다른 답변을 만드는 중이면 그 답변에 붙는다
+      if (error.code === 'CHAT409-3') {
+        const history = await fetchMessages(sessionId).catch(() => null)
+        if (history?.runningExecutionId) return listen(sessionId, history.runningExecutionId)
+      }
+      // 이미 다시 시도했거나(CHAT409-6) 다시 시도할 수 없는 답변(CHAT409-5): 목록을 새로 읽으면 버튼이 사라진다
+      if (error.code === 'CHAT409-5' || error.code === 'CHAT409-6') {
+        clearRetryCoords(sessionId, retryableExecutionId)
+        showToast(error.message)
+        await refreshMessages(sessionId)
+        return set({ status: 'idle' })
+      }
+    }
     set({ status: 'failed', errorMessage: error instanceof ApiError ? error.message : NETWORK_MESSAGE })
   }
 }

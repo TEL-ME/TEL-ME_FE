@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ChatMessage } from '../../../api/types'
 import { GUEST_LIMIT_MESSAGE } from '../guestLimitStore'
 import MessageList from './MessageList'
@@ -98,3 +98,41 @@ describe('MessageList 보내는 중인 질문', () => {
   })
 })
 
+
+describe('MessageList 실패한 답변 다시 시도 (TELME-219)', () => {
+  const failed: ChatMessage = {
+    ...userMessage(2, ''),
+    sequenceNo: 2,
+    replyToMessageId: 1,
+    role: 'ASSISTANT',
+    messageType: 'ANSWER',
+    content: null,
+    status: 'FAILED',
+  }
+  const list = [userMessage(1, '유심 재발급'), failed]
+
+  it('다시 시도할 수 있는 실패면 버튼을 누를 때 그 실행 ID를 넘긴다', () => {
+    const onRetry = vi.fn()
+    wrap(<MessageList {...base} messages={list} pendingQuestion={null} status="failed" retryableExecutionId={10} onRetry={onRetry} />)
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+    expect(onRetry).toHaveBeenCalledWith('유심 재발급', 10)
+  })
+
+  it('다시 시도할 수 없는 실패(이미 다시 시도함 등)는 버튼을 그리지 않는다', () => {
+    wrap(<MessageList {...base} messages={list} pendingQuestion={null} status="idle" retryableExecutionId={null} />)
+    expect(screen.getByText('답변을 받지 못했어요')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
+  })
+
+  it('서버가 자동으로 다시 시도하는 중이면 안내 문구를 보여 준다', () => {
+    wrap(<MessageList {...base} messages={[userMessage(1, '유심 재발급')]} pendingQuestion={null} status="thinking" retrying />)
+    expect(screen.getByText('답변 생성이 지연돼 다시 시도하고 있어요')).toBeInTheDocument()
+  })
+
+  it('다시 시도하는 동안에는 실패 말풍선 대신 대기 말풍선 하나만 보인다', () => {
+    wrap(<MessageList {...base} messages={list} pendingQuestion={null} status="thinking" retrying />)
+    expect(screen.queryByText('답변을 받지 못했어요')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByText('답변 생성이 지연돼 다시 시도하고 있어요')).toBeInTheDocument()
+  })
+})
