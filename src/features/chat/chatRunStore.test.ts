@@ -318,6 +318,29 @@ describe('답변 다시 시도 (TELME-219)', () => {
     expect(sessionStorage.getItem('telme.retryCoords')).toBeNull()
   })
 
+  it('여러 대화에서 위치 질문을 동시에 보내도 실패한 대화의 좌표로 다시 시도한다', async () => {
+    const there = { latitude: 35.1, longitude: 129.0 }
+    chatApi.sendMessage
+      .mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10 })
+      .mockResolvedValueOnce({ sessionId: 2, messageId: 6, executionId: 20 })
+    chatApi.retryExecution.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 11 })
+    // A에서 위치 질문 → 답변을 기다리는 중에 B로 옮겨 B에서도 위치 질문
+    attachSession(1)
+    await sendQuestion('근처 매장', undefined, here)
+    attachSession(2)
+    await sendQuestion('근처 매장', undefined, there)
+    // A가 백그라운드에서 실패하고, A로 돌아와 다시 시도
+    await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'LLM502-4', message: '실패', retryable: true })
+    attachSession(1)
+    await retryAnswer('근처 매장', 10)
+
+    expect(chatApi.retryExecution).toHaveBeenCalledWith(1, 10, here)
+    // B의 좌표는 그대로 남는다
+    const { retryCoordsFor } = await import('./retryCoords')
+    expect(retryCoordsFor(2, 20)).toEqual(there)
+    expect(retryCoordsFor(1, 10)).toBeUndefined()
+  })
+
   it('답변이 정상으로 끝나면 보관한 좌표를 지운다', async () => {
     chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10 })
     attachSession(1)

@@ -19,7 +19,7 @@ import {
 } from './guestLimitStore'
 import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
-import { clearRetryCoords, retryCoordsFor, saveRetryCoords } from './retryCoords'
+import { clearAllRetryCoords, clearRetryCoords, retryCoordsFor, saveRetryCoords } from './retryCoords'
 import { sessionsKey } from './sessionQueries'
 import { track } from '../../lib/analytics'
 
@@ -159,7 +159,7 @@ export function stopBackgroundStreams() {
   background.clear()
   syncBackground()
   clearAllUnread()
-  clearRetryCoords()
+  clearAllRetryCoords()
 }
 
 /** 백그라운드로 넘어간 구독이 끝났으면 true (목록을 새로 읽고 알린 뒤) */
@@ -396,11 +396,11 @@ export async function retryAnswer(
       : null
   set({ status: 'sending', typingMessageId: null, errorMessage: null, retrying: false })
   try {
-    // 같은 화면이면 메모리에서, 새로고침·대화 이동 뒤면 sessionStorage에서 좌표를 찾는다
-    const coords = located?.coords ?? retryCoordsFor(sessionId, retryableExecutionId)
+    // 실행별로 보관한 좌표를 먼저 쓰고(새로고침·대화 이동 뒤에도 남아 있다), 저장할 수 없던 환경이면 메모리 값을 쓴다
+    const coords = retryCoordsFor(sessionId, retryableExecutionId) ?? located?.coords
     const sent = await chatApi.retryExecution(sessionId, retryableExecutionId, coords)
-    // 다시 시도는 질문당 한 번이라 접수되면 좌표를 더 들고 있을 이유가 없다
-    clearRetryCoords()
+    // 다시 시도는 질문당 한 번이라 접수되면 그 실행의 좌표는 더 필요 없다 (다른 대화 것은 남긴다)
+    clearRetryCoords(sessionId, retryableExecutionId)
     applyGuestRemaining(sent.guestQuestionsRemaining)
     if (located) located.executionId = sent.executionId ?? null
     if (get().sessionId !== sessionId) {
@@ -421,7 +421,7 @@ export async function retryAnswer(
       }
       // 이미 다시 시도했거나(CHAT409-6) 다시 시도할 수 없는 답변(CHAT409-5): 목록을 새로 읽으면 버튼이 사라진다
       if (error.code === 'CHAT409-5' || error.code === 'CHAT409-6') {
-        clearRetryCoords()
+        clearRetryCoords(sessionId, retryableExecutionId)
         showToast(error.message)
         await refreshMessages(sessionId)
         return set({ status: 'idle' })
