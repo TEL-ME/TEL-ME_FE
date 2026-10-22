@@ -257,6 +257,7 @@ describe('답변 다시 시도 (TELME-219)', () => {
     closeLoginSheet()
     liftGuestLimit()
     forgetCoords()
+    sessionStorage.clear()
     subs.length = 0
     chatApi.sendMessage.mockReset()
     chatApi.retryExecution.mockReset()
@@ -300,6 +301,30 @@ describe('답변 다시 시도 (TELME-219)', () => {
     await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'LLM502-4', message: '실패', retryable: true })
     await retryAnswer('근처 매장', 10)
     expect(chatApi.retryExecution).toHaveBeenCalledWith(1, 10, here)
+  })
+
+  it('다른 대화에 갔다 오거나 새로고침한 뒤에도 위치 질문은 좌표를 붙여 다시 시도한다', async () => {
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10 })
+    chatApi.retryExecution.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 11 })
+    attachSession(1)
+    await sendQuestion('근처 매장', undefined, here)
+    await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'LLM502-4', message: '실패', retryable: true })
+    // 대화 이동 (새로고침도 메모리가 비는 것은 같다)
+    attachSession(2)
+    attachSession(1)
+    await retryAnswer('근처 매장', 10)
+    expect(chatApi.retryExecution).toHaveBeenCalledWith(1, 10, here)
+    // 다시 시도는 한 번뿐이라 접수되면 지운다
+    expect(sessionStorage.getItem('telme.retryCoords')).toBeNull()
+  })
+
+  it('답변이 정상으로 끝나면 보관한 좌표를 지운다', async () => {
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10 })
+    attachSession(1)
+    await sendQuestion('근처 매장', undefined, here)
+    expect(sessionStorage.getItem('telme.retryCoords')).not.toBeNull()
+    await subs[0].handlers.onComplete(done(1))
+    expect(sessionStorage.getItem('telme.retryCoords')).toBeNull()
   })
 
   it('게스트 한도에 걸려 있어도 다시 시도는 막지 않는다 (질문 수에 세지 않음)', async () => {
