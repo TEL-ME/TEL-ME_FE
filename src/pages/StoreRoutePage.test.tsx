@@ -213,4 +213,32 @@ describe('StoreRoutePage', () => {
     expect(screen.getByText('강남역')).toBeInTheDocument()
     expect(routeCalls).toEqual(['TRANSIT'])
   })
+  it('버스·지하철 단계는 눌러서 지도에서 그 구간을 보고, 다시 누르면 해제한다', async () => {
+    const bus = {
+      type: 'BUS',
+      guidance: '간선 110B국민대 (원효로제1동주민센터 > 순천향대학병원.한남오거리)',
+      distanceMeters: 4600,
+      durationSeconds: 1140,
+      lineName: '110B국민대',
+      path: [
+        { latitude: 37.54, longitude: 126.96 },
+        { latitude: 37.53, longitude: 127.0 },
+      ],
+    }
+    routeReply = () => json(200, ok({ ...TRANSIT, steps: [TRANSIT.steps[0], bus] }))
+    const user = userEvent.setup()
+    renderPage()
+
+    const step = await screen.findByRole('button', { name: /버스 110B국민대/ })
+    expect(step).toHaveAttribute('aria-pressed', 'false')
+    // 좌표가 없는 도보 단계는 누를 수 없다
+    expect(screen.queryByRole('button', { name: /역까지 걷기/ })).not.toBeInTheDocument()
+
+    await user.click(step)
+    expect(step).toHaveAttribute('aria-pressed', 'true')
+    expect(step).toHaveTextContent('전체 경로 보기')
+
+    await user.click(step)
+    expect(step).toHaveAttribute('aria-pressed', 'false')
+  })
 })

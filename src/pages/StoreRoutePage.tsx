@@ -1,5 +1,5 @@
 import { Bike, Bus, Car, ChevronLeft, ExternalLink, Footprints, LocateFixed, TrainFront } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import type { RouteMode, RouteStep, RouteStepType } from '../api/stores'
@@ -11,7 +11,15 @@ import { canLocate, locateErrorMessage, locateMe } from '../features/stores/loca
 import { useStoreDetail } from '../features/stores/queries'
 import RouteMap from '../features/stores/route/RouteMap'
 import { routeErrorView } from '../features/stores/route/routeError'
-import { durationText, fareText, isArrived, ROUTE_MODES, STEP_LABEL, transfersText } from '../features/stores/route/routeText'
+import {
+  durationText,
+  fareText,
+  isArrived,
+  isFocusable,
+  ROUTE_MODES,
+  STEP_LABEL,
+  transfersText,
+} from '../features/stores/route/routeText'
 import { useStoreRoute } from '../features/stores/route/useStoreRoute'
 
 interface Origin {
@@ -51,11 +59,22 @@ function Frame({ onBack, children }: { onBack: () => void; children: ReactNode }
   )
 }
 
-function StepItem({ step }: { step: RouteStep }) {
+interface StepItemProps {
+  step: RouteStep
+  /** 있으면 눌러서 지도에서 이 구간을 볼 수 있다 (자동차를 뺀 단계 중 좌표가 있는 것) */
+  onSelect?: () => void
+  selected?: boolean
+}
+
+function StepItem({ step, onSelect, selected = false }: StepItemProps) {
   const title = step.lineName ? `${STEP_LABEL[step.type]} ${step.lineName}` : STEP_LABEL[step.type]
-  return (
-    <li className="flex gap-3 py-3">
-      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-sub">
+  const body = (
+    <>
+      <span
+        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+          selected ? 'bg-brand text-white' : 'bg-surface-2 text-ink-sub'
+        }`}
+      >
         {STEP_ICON[step.type]}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -63,8 +82,22 @@ function StepItem({ step }: { step: RouteStep }) {
         {step.guidance && <span className="text-sm leading-5 text-ink-sub">{step.guidance}</span>}
         <span className="text-xs text-ink-muted">
           {durationText(step.durationSeconds)} · {formatDistance(step.distanceMeters)}
+          {onSelect && <span className="text-brand-text"> · {selected ? '전체 경로 보기' : '지도에서 보기'}</span>}
         </span>
       </div>
+    </>
+  )
+  if (!onSelect) return <li className="flex gap-3 py-3">{body}</li>
+  return (
+    <li>
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={onSelect}
+        className={`-mx-2 flex w-[calc(100%+16px)] gap-3 rounded-xl px-2 py-3 text-left ${selected ? 'bg-surface-2' : ''}`}
+      >
+        {body}
+      </button>
     </li>
   )
 }
@@ -83,6 +116,9 @@ export default function StoreRoutePage() {
   const [originError, setOriginError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
+  /** 지도에서 보고 있는 단계. 어느 결과(seq)의 몇 번째 단계인지 함께 들고 있어, 새 결과가 오면 저절로 풀린다 */
+  const [focus, setFocus] = useState<{ seq: number; index: number } | null>(null)
+  const mapRef = useRef<HTMLDivElement>(null)
 
   const back = () => goBack(navigate, storeId ? `/stores/${storeId}` : '/stores')
 
@@ -203,6 +239,13 @@ export default function StoreRoutePage() {
   )
 
   const result = state.status !== 'idle' && state.mode === mode ? state : null
+  const focusIndex = result?.status === 'success' && focus?.seq === result.seq ? focus.index : null
+  /** 단계를 누르면 그 구간을 지도에 보여 주고, 다시 누르면 전체 경로로 돌아간다. 목록이 길면 지도가 보이게 올린다 */
+  const selectStep = (seq: number, index: number) => {
+    const next = focusIndex === index ? null : { seq, index }
+    setFocus(next)
+    if (next) mapRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }
 
   return (
     <Frame onBack={back}>
@@ -272,12 +315,15 @@ export default function StoreRoutePage() {
         </div>
 
         {origin && (
-          <RouteMap
-            origin={origin.center}
-            destination={destination}
-            route={result?.status === 'success' ? result.data : null}
-            fitKey={result?.status === 'success' ? result.seq : 0}
-          />
+          <div ref={mapRef} className="scroll-mt-4">
+            <RouteMap
+              origin={origin.center}
+              destination={destination}
+              route={result?.status === 'success' ? result.data : null}
+              fitKey={result?.status === 'success' ? result.seq : 0}
+              focusIndex={focusIndex}
+            />
+          </div>
         )}
 
         {result?.status === 'loading' && (
@@ -302,7 +348,12 @@ export default function StoreRoutePage() {
               </div>
               <ol aria-label="단계별 안내" className="mt-1 divide-y divide-surface-2">
                 {result.data.steps.map((step, i) => (
-                  <StepItem key={i} step={step} />
+                  <StepItem
+                    key={i}
+                    step={step}
+                    selected={focusIndex === i}
+                    onSelect={isFocusable(step) ? () => selectStep(result.seq, i) : undefined}
+                  />
                 ))}
               </ol>
             </section>
