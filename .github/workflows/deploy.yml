@@ -10,6 +10,10 @@ name: Deploy
 #   VITE_KAKAO_MAP_KEY          카카오 지도 JavaScript 키(브라우저에 그대로 노출되는 키라 변수로 둔다)
 #   VITE_SENTRY_DSN             (선택) Sentry DSN. 비우면 오류를 수집하지 않는다
 #   VITE_SENTRY_ENVIRONMENT     (선택) Sentry 환경 이름. 비우면 beta
+#   VITE_CLARITY_ENABLED        (선택) true일 때만 수집. 비우면 false
+#   VITE_CLARITY_PROJECT_ID     (선택) Clarity 프로젝트 식별자
+#   VITE_CLARITY_ENVIRONMENT    (선택) Clarity 환경 이름. 비우면 beta
+#   VITE_GA_MEASUREMENT_ID      (선택) GA4 측정 ID. 비우면 사용자 행동을 수집하지 않는다
 on:
   push:
     branches: [develop]
@@ -62,6 +66,10 @@ jobs:
           VITE_KAKAO_MAP_KEY: ${{ vars.VITE_KAKAO_MAP_KEY }}
           VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
           VITE_SENTRY_ENVIRONMENT: ${{ vars.VITE_SENTRY_ENVIRONMENT || 'beta' }}
+          VITE_CLARITY_ENABLED: ${{ vars.VITE_CLARITY_ENABLED || 'false' }}
+          VITE_CLARITY_PROJECT_ID: ${{ vars.VITE_CLARITY_PROJECT_ID }}
+          VITE_CLARITY_ENVIRONMENT: ${{ vars.VITE_CLARITY_ENVIRONMENT || 'beta' }}
+          VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID }}
         run: npm run build
 
       - name: AWS 자격 증명(OIDC)

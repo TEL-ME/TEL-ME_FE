@@ -43,6 +43,7 @@ import { CHAT_GPS_ENABLED, hasChoices, isLocationAsk, wantsNearbyStore } from '.
 import { locateErrorMessage, locateMe } from '../features/stores/locate'
 import { rememberMe } from '../features/stores/storeSearchStore'
 import { takeHandedQuestion } from '../features/chat/askHandoff'
+import { track } from '../lib/analytics'
 
 const MUDO_BY_STATUS: Record<ChatStatus, MudoStatus> = {
   idle: 'idle',
@@ -216,6 +217,7 @@ export default function ChatPage() {
     setEnding(true)
     try {
       await chatApi.closeSession(activeId)
+      track('consult_end_success')
       await queryClient.invalidateQueries({ queryKey: sessionsKey })
       toBottom()
       showToast('상담을 종료했어요.\n기록은 대화 목록에서 다시 볼 수 있어요', 3000)
@@ -304,7 +306,12 @@ export default function ChatPage() {
               <button
                 type="button"
                 disabled={busy || ending}
-                onClick={() => setConfirmEnd(true)}
+                onClick={() => {
+                  track('consult_end_open')
+                  setConfirmEnd(true)
+                }}
+                data-clarity-unmask="true"
+                data-clarity-action="consult_end_open"
                 className="pointer-events-auto flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold text-ink-sub shadow-[0_2px_8px_rgba(0,0,0,0.08)] disabled:opacity-50"
               >
                 <CircleCheck size={15} strokeWidth={2} aria-hidden />
@@ -357,9 +364,13 @@ export default function ChatPage() {
       <ConfirmDialog
         open={confirmEnd}
         title="상담을 종료할까요?"
+        clarityScope="consultation-end"
         confirmLabel="종료"
         onCancel={() => setConfirmEnd(false)}
-        onConfirm={() => void endConsult()}
+        onConfirm={() => {
+          track('consult_end_confirm')
+          void endConsult()
+        }}
       >
         종료하면 이 대화에는 더 질문할 수 없어요. 기록은 계속 볼 수 있어요.
       </ConfirmDialog>

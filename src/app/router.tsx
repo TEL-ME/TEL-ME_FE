@@ -29,6 +29,7 @@ import StoreDetailPage from '../pages/StoreDetailPage'
 import StoreRegionPage from '../pages/StoreRegionPage'
 import StoresPage from '../pages/StoresPage'
 import { RouteErrorScreen } from './ErrorScreen'
+import ClarityRouteTracker from '../lib/ClarityRouteTracker'
 
 const routes: RouteObject[] = [
   {
@@ -87,4 +88,6 @@ const routes: RouteObject[] = [
 ]
 
 // 모든 화면을 하나로 감싸 errorElement를 둔다. 화면 오류가 나면 안내 화면을 보여 주고 Sentry로 보낸다
-export const router = createBrowserRouter([{ errorElement: <RouteErrorScreen />, children: routes }])
+export const router = createBrowserRouter([
+  { element: <ClarityRouteTracker />, errorElement: <RouteErrorScreen />, children: routes },
+])

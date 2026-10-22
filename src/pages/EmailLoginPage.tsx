@@ -9,6 +9,7 @@ import { takeLoginReturn } from '../features/auth/loginSheetStore'
 import { loginSchema, type LoginForm } from '../features/auth/schemas'
 import { afterLogin } from '../features/auth/useAuth'
 import { showToast } from '../stores/toastStore'
+import { track } from '../lib/analytics'
 
 export default function EmailLoginPage() {
   const navigate = useNavigate()
@@ -25,6 +26,7 @@ export default function EmailLoginPage() {
     try {
       await authApi.login(email, password)
       await afterLogin()
+      track('login', { method: 'email' })
       showToast('로그인했어요. 게스트로 나눈 상담도 이어져요')
       navigate(takeLoginReturn(), { replace: true })
     } catch (e) {

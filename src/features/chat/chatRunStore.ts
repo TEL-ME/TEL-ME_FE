@@ -20,6 +20,7 @@ import {
 import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
+import { track } from '../../lib/analytics'
 
 /**
  * 채팅 상태 (문서 3. 채팅 상태)
@@ -283,6 +284,7 @@ export async function sendQuestion(
       const session = await chatApi.createSession()
       sessionId = session.sessionId
       created = sessionId
+      track('consult_start')
       set({ sessionId })
     }
     sendingSessionId = sessionId
@@ -293,6 +295,7 @@ export async function sendQuestion(
     const sent = await chatApi.sendMessage(sessionId, content, sendCoords).finally(() => {
       sendingSessionId = null
     })
+    track('question_send')
     applyGuestRemaining(sent.guestQuestionsRemaining)
     moveToCreated()
     if (get().sessionId !== sessionId) {

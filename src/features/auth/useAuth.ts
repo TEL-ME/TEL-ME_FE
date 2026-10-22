@@ -5,6 +5,7 @@ import { queryClient } from '../../lib/queryClient'
 import { attachSession, stopBackgroundStreams } from '../chat/chatRunStore'
 import { liftGuestLimit } from '../chat/guestLimitStore'
 import { liftRestriction } from '../chat/inputGuardStore'
+import { track } from '../../lib/analytics'
 
 export const meKey = ['auth', 'me'] as const
 const GUEST: Me = { authenticated: false, userId: null, email: null, name: null, role: 'GUEST', loginMethods: [] }
@@ -26,6 +27,7 @@ export async function afterLogin() {
 }
 
 export async function logout() {
+  track('logout')
   try {
     await authApi.logout()
   } finally {

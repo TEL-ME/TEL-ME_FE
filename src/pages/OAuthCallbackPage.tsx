@@ -5,6 +5,7 @@ import { openLoginSheet, setLoginReturn, takeLoginReturn } from '../features/aut
 import { PROVIDER_NAME, takeOauthProvider } from '../features/auth/socialProviders'
 import { afterLogin } from '../features/auth/useAuth'
 import { showToast } from '../stores/toastStore'
+import { track } from '../lib/analytics'
 
 /** 일반 소셜 로그인 실패 이유 (MEMBER409-1은 따로 선택 화면으로 보낸다) */
 const REASON_MESSAGE: Record<string, string> = {
@@ -49,6 +50,7 @@ export default function OAuthCallbackPage() {
 
     if (success) {
       void afterLogin().then(() => {
+        track('login', { method: oauth ? oauth.toLowerCase() : 'social' })
         showToast(oauth ? `${PROVIDER_NAME[oauth]}로 로그인했어요` : '로그인했어요')
         navigate(to, { replace: true })
       })

@@ -11,6 +11,7 @@ import { SocialIcon } from '../features/auth/SocialIcon'
 import { asProvider, PROVIDER_NAME } from '../features/auth/socialProviders'
 import { afterLogin } from '../features/auth/useAuth'
 import { showToast } from '../stores/toastStore'
+import { track } from '../lib/analytics'
 
 const EXPIRED = 'MEMBER400-0'
 const EXPIRED_MESSAGE = '시간이 지나 연결 요청이 만료됐어요. 다시 로그인해 주세요.'
@@ -34,6 +35,7 @@ export default function SocialMatchPage() {
 
   const finish = async (message: string) => {
     await afterLogin()
+    track('login', { method: provider ? provider.toLowerCase() : 'social' })
     showToast(message)
     navigate(takeLoginReturn(), { replace: true })
   }
