@@ -55,4 +55,25 @@ describe('StoreResults', () => {
     expect(screen.queryByText(/기준/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '지도로 보기' })).not.toBeInTheDocument()
   })
+
+  it('가까운 순 안내면 가장 가까운 매장을 지도와 함께 맨 위에 두고, 나머지는 아래 목록으로 보여 준다', () => {
+    // 응답 순서와 상관없이 거리가 가장 짧은 매장을 고른다
+    renderResults(
+      <StoreResults items={[STORES[1], STORES[0]]} context={{ type: 'CURRENT_LOCATION', label: '현재 위치', radiusMeters: 3000 }} />,
+    )
+    const nearest = screen.getByRole('link', { name: '가장 가까운 매장 텔미 강남구4호점' })
+    expect(nearest).toHaveAttribute('href', '/stores/114')
+    expect(screen.getByRole('img', { name: '텔미 강남구4호점 위치' })).toBeInTheDocument()
+    expect(screen.getByText('다른 매장 1곳')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /텔미 강남구6호점/ })).toHaveAttribute('href', '/stores/136')
+  })
+
+  it('지역 전체 검색(거리 없음)이나 좌표가 없는 예전 메시지는 지도 없이 목록만 보여 준다', () => {
+    renderResults(<StoreResults items={STORES.map((s) => ({ ...s, distanceMeters: null }))} />)
+    expect(screen.queryByText('가장 가까운 매장')).not.toBeInTheDocument()
+    expect(screen.queryByText(/다른 매장/)).not.toBeInTheDocument()
+
+    renderResults(<StoreResults items={[{ storeId: 2, name: '텔미 부산점', distanceMeters: 300 }]} />)
+    expect(screen.queryByText('가장 가까운 매장')).not.toBeInTheDocument()
+  })
 })
