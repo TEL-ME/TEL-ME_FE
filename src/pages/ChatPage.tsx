@@ -18,7 +18,10 @@ import {
 } from '../features/chat/chatRunStore'
 import ChatHeader from '../features/chat/components/ChatHeader'
 import Composer from '../features/chat/components/Composer'
+import GuestLimitPanel from '../features/chat/components/GuestLimitPanel'
+import GuestRemainingBanner from '../features/chat/components/GuestRemainingBanner'
 import InputGuardBanner from '../features/chat/components/InputGuardBanner'
+import { refreshGuestLimit, useGuestLimited } from '../features/chat/guestLimitStore'
 import { useRestrictionText } from '../features/chat/useRestrictionText'
 import HomeIntro from '../features/chat/components/HomeIntro'
 import MessageList from '../features/chat/components/MessageList'
@@ -106,7 +109,11 @@ export default function ChatPage() {
   useLayoutEffect(() => {
     restorePosition()
   }, [older?.messages.length, restorePosition])
-  const { isUser } = useMe()
+  const { isUser, isLoading: meLoading } = useMe()
+  // 게스트면 들어올 때 오늘 남은 질문 수를 서버에서 받는다 (새로고침·다른 기기에서도 서버 값과 맞춘다, TELME-213)
+  useEffect(() => {
+    if (!meLoading && !isUser) void refreshGuestLimit()
+  }, [meLoading, isUser])
 
   // 게스트가 평가하려다 로그인했다면, 돌아와서 그 평가를 이어서 한다 (문서 1번)
   useEffect(() => {
@@ -228,6 +235,8 @@ export default function ChatPage() {
 
   // 반복 욕설로 일시 제한 중이면 입력을 막는다 (TELME-119)
   const restriction = useRestrictionText()
+  // 게스트가 오늘 질문을 모두 썼으면 입력창 자리에 로그인 안내를 둔다 (백엔드 TELME-213). 로그인하면 바로 풀린다
+  const guestLimited = useGuestLimited() && !isUser
 
   const listProps = { currentId: activeId, busy, onPick: pickSession, onNewChat: newChat }
 
@@ -276,6 +285,8 @@ export default function ChatPage() {
                 status={status}
                 typingMessageId={own ? run.typingMessageId : null}
                 errorMessage={own ? run.errorMessage : null}
+                guestLimited={own && run.guestLimited}
+                askLocked={guestLimited}
                 onTyped={finishTyping}
                 onAsk={ask}
                 onRetry={retry}
@@ -283,7 +294,7 @@ export default function ChatPage() {
               />
               </>
             ) : (
-              <HomeIntro disabled={busy} onAsk={ask} />
+              <HomeIntro disabled={busy || guestLimited} onAsk={ask} />
             )}
           </div>
         </main>
@@ -332,9 +343,13 @@ export default function ChatPage() {
               </button>
             </div>
           ) : (
-            !notFound && (
+            !notFound &&
+            (guestLimited ? (
+              <GuestLimitPanel />
+            ) : (
               <>
                 <InputGuardBanner />
+                {!isUser && <GuestRemainingBanner />}
                 <Composer
                   busy={busy || locating}
                   placeholder={locating ? '현재 위치를 확인하고 있어요…' : placeholder}
@@ -342,7 +357,7 @@ export default function ChatPage() {
                   onSend={(q) => void askTyped(q)}
                 />
               </>
-            )
+            ))
           )}
         </footer>
       </div>

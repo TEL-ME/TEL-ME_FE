@@ -7,6 +7,7 @@ import type {
   ChatSession,
   ChatSessionList,
   ChatSources,
+  GuestLimitStatus,
 } from './types'
 
 const BASE = '/api/v1/chat'
@@ -65,6 +66,9 @@ export const chatApi = {
   /** 종료한다. 기록은 남고 더 질문할 수 없다 */
   closeSession: (sessionId: number) => api<ChatSession>(`${BASE}/sessions/${sessionId}/close`, { method: 'PATCH' }),
 
+
+  /** 게스트의 오늘 남은 질문 수 (TELME-213) */
+  getGuestLimit: () => api<GuestLimitStatus>(`${BASE}/guest-limit`),
 
   getSources: (messageId: number) => api<ChatSources>(`${BASE}/messages/${messageId}/sources`),
 }
