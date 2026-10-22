@@ -337,7 +337,7 @@ export default function StoreRoutePage() {
           (isArrived(result.data) ? (
             <p className="rounded-card bg-surface p-4 text-center text-[15px] font-semibold">이미 매장 근처에 있어요.</p>
           ) : (
-            <section className="flex flex-col rounded-card bg-surface px-4 pt-4">
+            <section className="flex flex-col rounded-card bg-surface px-4 pb-2 pt-4">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <span className="text-2xl font-extrabold tracking-[-0.5px]">{durationText(result.data.durationSeconds)}</span>
                 <span className="text-sm text-ink-sub">{formatDistance(result.data.distanceMeters)}</span>
