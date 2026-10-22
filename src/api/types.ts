@@ -89,6 +89,11 @@ export interface ChatMessageHistory {
   hasOlderMessages: boolean
   /** 답변 생성 중이면 그 실행 ID. 새로고침 후 이 값으로 SSE를 다시 구독한다 */
   runningExecutionId: number | null
+  /**
+   * 마지막 답변이 일시적인 생성 실패(LLM502-4)이고 아직 다시 시도하지 않았으면 그 실행 ID (TELME-219).
+   * 이 값이 있을 때만 "다시 시도" 버튼을 그리고, 재시도 API에 그대로 넘긴다
+   */
+  retryableExecutionId?: number | null
 }
 
 /**
@@ -164,6 +169,8 @@ export interface ChatFailure {
   status: 'FAILED' | 'TIMEOUT' | 'CANCELLED'
   errorCode: string
   message: string
+  /** 재시도 API로 다시 만들 수 있는 실패 (LLM502-4). 질문당 한 번만 */
+  retryable?: boolean
 }
 
 // ---- 피드백 ----

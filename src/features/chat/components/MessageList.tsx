@@ -36,12 +36,20 @@ interface MessageListProps {
   onAsk: (question: string, coords?: ChatCoordinates) => void
   /** 종료된 대화: 빠른 답 버튼을 보여 주지 않는다 */
   closed?: boolean
-  /** failedMessageId가 null이면 질문이 서버에 저장되기 전에 실패한 경우 */
-  onRetry: (question: string, failedMessageId: number | null) => void
+  /**
+   * 다시 시도할 수 있는 실패 답변의 실행 ID (메시지 목록의 retryableExecutionId).
+   * 있을 때만 마지막 실패 답변에 "다시 시도"를 그린다. 이미 다시 시도했거나 일시적인 실패가 아니면 null
+   */
+  retryableExecutionId?: number | null
+  /** 서버가 답변 생성을 자동으로 다시 시도하는 중 (SSE status: RETRYING) */
+  retrying?: boolean
+  /** retryableExecutionId가 null이면 질문이 서버에 저장되기 전에 실패한 경우 (같은 질문을 다시 보낸다) */
+  onRetry: (question: string, retryableExecutionId: number | null) => void
 }
 
 const FAIL_STATUSES = new Set(['FAILED', 'TIMEOUT', 'CANCELLED'])
 const FALLBACK_ERROR = '답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'
+const RETRYING_NOTICE = '답변 생성이 지연돼 다시 시도하고 있어요'
 
 /** 평가 가능한 답변: 백엔드가 ratable로 알려 준다 (완료된 상담 답변·매장 추천) */
 const canRate = (m: ChatMessage) => m.ratable && m.status === 'COMPLETED'
@@ -76,6 +84,8 @@ export default function MessageList({
   onAsk,
   onRetry,
   closed = false,
+  retryableExecutionId = null,
+  retrying = false,
 }: MessageListProps) {
   const busy = isBusy(status)
   // 대화를 바꾸거나 화면을 떠나면 듣던 답변을 멈춘다
@@ -97,16 +107,23 @@ export default function MessageList({
   const lastAnswerId =
     !showPending && last?.role === 'ASSISTANT' && last.status === 'COMPLETED' ? last.messageId : null
 
-  const retryButton = (question: string, failedMessageId: number | null) => (
+  const retryButton = (question: string, executionId: number | null) => (
     <button
       type="button"
       disabled={busy}
-      onClick={() => onRetry(question, failedMessageId)}
+      onClick={() => onRetry(question, executionId)}
       className="mt-2.5 flex min-h-9 items-center gap-1.5 rounded-full bg-surface-2 px-3.5 text-sm font-semibold text-ink disabled:opacity-50"
     >
       <RotateCw size={15} strokeWidth={2} aria-hidden />
       다시 시도
     </button>
+  )
+
+  const thinkingBubble = (key: number | string, notice: boolean) => (
+    <BotBubble key={key}>
+      <ThinkingDots label={notice ? RETRYING_NOTICE : undefined} />
+      {notice && <p className="m-0 mt-1 text-sm text-ink-sub">{RETRYING_NOTICE}</p>}
+    </BotBubble>
   )
 
   return (
@@ -125,11 +142,7 @@ export default function MessageList({
         }
 
         if (m.status === 'GENERATING') {
-          return (
-            <BotBubble key={m.messageId}>
-              <ThinkingDots />
-            </BotBubble>
-          )
+          return thinkingBubble(m.messageId, i === sorted.length - 1 && retrying)
         }
 
         if (FAIL_STATUSES.has(m.status)) {
@@ -138,7 +151,7 @@ export default function MessageList({
           return (
             <BotBubble key={m.messageId} tone="error" meta="답변을 받지 못했어요">
               <p className="m-0">{m.content || (isLast && errorMessage) || FALLBACK_ERROR}</p>
-              {isLast && question && retryButton(question, m.messageId)}
+              {isLast && question && retryableExecutionId != null && retryButton(question, retryableExecutionId)}
             </BotBubble>
           )
         }
@@ -185,11 +198,7 @@ export default function MessageList({
 
       {showPending && <PendingUserBubble failed={showSendError} />}
 
-      {showThinking && (
-        <BotBubble>
-          <ThinkingDots />
-        </BotBubble>
-      )}
+      {showThinking && thinkingBubble('thinking', retrying)}
 
       {showSendError && pendingQuestion && (
         <BotBubble

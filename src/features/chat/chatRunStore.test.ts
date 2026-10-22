@@ -5,16 +5,21 @@ import type { ChatExecutionState } from '../../api/types'
 import { closeLoginSheet, useLoginSheet } from '../auth/loginSheetStore'
 import { GUEST_LIMIT_LOGIN_NOTE, GUEST_LIMIT_MESSAGE, liftGuestLimit, useGuestLimit } from './guestLimitStore'
 
-const subs: { sessionId: number; handlers: ExecutionHandlers; stop: ReturnType<typeof vi.fn> }[] = []
+const subs: { sessionId: number; executionId: number; handlers: ExecutionHandlers; stop: ReturnType<typeof vi.fn> }[] = []
 
 // guestLimitStore도 chatApi를 쓰므로 vi.mock보다 먼저 만든다
-const chatApi = vi.hoisted(() => ({ sendMessage: vi.fn(), createSession: vi.fn(), getGuestLimit: vi.fn() }))
+const chatApi = vi.hoisted(() => ({
+  sendMessage: vi.fn(),
+  createSession: vi.fn(),
+  getGuestLimit: vi.fn(),
+  retryExecution: vi.fn(),
+}))
 
 vi.mock('../../api/chat', () => ({
   chatApi,
-  subscribeExecution: (sessionId: number, _executionId: number, handlers: ExecutionHandlers) => {
+  subscribeExecution: (sessionId: number, executionId: number, handlers: ExecutionHandlers) => {
     const stop = vi.fn()
-    subs.push({ sessionId, handlers, stop })
+    subs.push({ sessionId, executionId, handlers, stop })
     return stop
   },
 }))
@@ -30,6 +35,7 @@ vi.mock('./answerNotifier', async (importOriginal) => ({
 const {
   attachSession,
   resumeExecution,
+  retryAnswer,
   sendQuestion,
   stopBackgroundStreams,
   useBackgroundRuns,
@@ -37,6 +43,7 @@ const {
 } = await import('./chatRunStore')
 const { coordsForNext, forgetCoords } = await import('./heldCoords')
 const { notifyAnswer } = await import('./answerNotifier')
+const { useToastStore } = await import('../../stores/toastStore')
 
 const done = (sessionId: number): ChatExecutionState => ({
   sessionId,
@@ -238,5 +245,86 @@ describe('게스트 남은 질문 수 (TELME-213 후속)', () => {
     await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'MODEL_ERROR', message: '답변을 만들지 못했어요' })
     expect(chatApi.getGuestLimit).toHaveBeenCalledTimes(1)
     await vi.waitFor(() => expect(useGuestLimit.getState().remaining).toBe(5))
+  })
+})
+
+describe('답변 다시 시도 (TELME-219)', () => {
+  const here = { latitude: 37.5, longitude: 127.0 }
+
+  beforeEach(() => {
+    attachSession(null)
+    stopBackgroundStreams()
+    closeLoginSheet()
+    liftGuestLimit()
+    forgetCoords()
+    subs.length = 0
+    chatApi.sendMessage.mockReset()
+    chatApi.retryExecution.mockReset()
+  })
+
+  it('서버가 자동으로 다시 시도하는 동안 안내를 띄우고, 답이 끝나면 내린다', async () => {
+    attachSession(1)
+    resumeExecution(1, 10)
+    subs[0].handlers.onStatus?.('RETRYING')
+    expect(useChatRun.getState().retrying).toBe(true)
+
+    await subs[0].handlers.onComplete(done(1))
+    expect(useChatRun.getState().retrying).toBe(false)
+  })
+
+  it('실패로 끝나도 안내를 내린다', async () => {
+    attachSession(1)
+    resumeExecution(1, 10)
+    subs[0].handlers.onStatus?.('RETRYING')
+    await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'LLM502-4', message: '답변 생성에 실패했습니다.', retryable: true })
+    expect(useChatRun.getState()).toMatchObject({ status: 'failed', retrying: false })
+  })
+
+  it('재시도 API로 같은 질문에 새 실행을 붙이고, 그 실행을 구독한다', async () => {
+    chatApi.retryExecution.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 11 })
+    attachSession(1)
+    useChatRun.setState({ status: 'failed' })
+    await retryAnswer('유심 재발급 비용', 10)
+
+    expect(chatApi.retryExecution).toHaveBeenCalledWith(1, 10, undefined)
+    expect(chatApi.sendMessage).not.toHaveBeenCalled()
+    expect(subs.at(-1)).toMatchObject({ sessionId: 1, executionId: 11 })
+    expect(useChatRun.getState()).toMatchObject({ status: 'thinking', pendingQuestion: null })
+  })
+
+  it('위치와 함께 보낸 질문이면 다시 시도할 때도 좌표를 붙인다', async () => {
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10 })
+    chatApi.retryExecution.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 11 })
+    attachSession(1)
+    await sendQuestion('근처 매장', undefined, here)
+    await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'LLM502-4', message: '실패', retryable: true })
+    await retryAnswer('근처 매장', 10)
+    expect(chatApi.retryExecution).toHaveBeenCalledWith(1, 10, here)
+  })
+
+  it('게스트 한도에 걸려 있어도 다시 시도는 막지 않는다 (질문 수에 세지 않음)', async () => {
+    useGuestLimit.setState({ remaining: 0, limitedUntil: Date.now() + 60_000 })
+    chatApi.retryExecution.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 11 })
+    attachSession(1)
+    await retryAnswer('유심 재발급 비용', 10)
+    expect(chatApi.retryExecution).toHaveBeenCalled()
+    expect(useLoginSheet.getState().open).toBe(false)
+  })
+
+  it('이미 다시 시도한 질문이면(CHAT409-6) 서버 안내를 띄우고 멈춘다', async () => {
+    chatApi.retryExecution.mockRejectedValueOnce(new ApiError(409, 'CHAT409-6', '이미 다시 시도한 질문입니다.'))
+    attachSession(1)
+    await retryAnswer('유심 재발급 비용', 10)
+    expect(useToastStore.getState().message).toBe('이미 다시 시도한 질문입니다.')
+    expect(useChatRun.getState().status).toBe('idle')
+    expect(subs).toHaveLength(0)
+  })
+
+  it('질문이 저장되기 전에 실패했으면 같은 질문을 처음부터 다시 보낸다', async () => {
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10 })
+    attachSession(1)
+    await retryAnswer('유심 재발급 비용', null)
+    expect(chatApi.retryExecution).not.toHaveBeenCalled()
+    expect(chatApi.sendMessage).toHaveBeenCalledWith(1, '유심 재발급 비용', undefined)
   })
 })

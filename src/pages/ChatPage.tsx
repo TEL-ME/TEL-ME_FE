@@ -168,9 +168,9 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
 
-  const retry = (question: string, failedMessageId: number | null) => {
+  const retry = (question: string, retryableExecutionId: number | null) => {
     toBottom()
-    void retryAnswer(question, failedMessageId, (id) => navigate(`/chat/${id}`))
+    void retryAnswer(question, retryableExecutionId, (id) => navigate(`/chat/${id}`))
   }
 
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -290,6 +290,8 @@ export default function ChatPage() {
                 onTyped={finishTyping}
                 onAsk={ask}
                 onRetry={retry}
+                retryableExecutionId={history?.retryableExecutionId ?? null}
+                retrying={own && run.retrying}
                 closed={closed}
               />
               </>

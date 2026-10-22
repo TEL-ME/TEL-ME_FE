@@ -53,11 +53,16 @@ export const chatApi = {
     }),
 
   /**
-   * 실패한 답변 다시 생성 (전용 API, 백엔드에 요청 예정 — 경로는 가안).
-   * VITE_RETRY_API=true일 때만 쓰고, 그 전에는 chatRunStore가 같은 질문을 다시 보낸다.
+   * 실패한 답변 다시 만들기 (TELME-219). 질문은 새로 저장하지 않고 같은 질문에 새 실행만 붙는다.
+   * executionId는 error 이벤트의 retryable=true인 실행, 새로고침 후에는 메시지 목록의 retryableExecutionId.
+   * 질문당 한 번만 되고, 게스트 하루 질문 수에도 세지 않는다.
+   * 처음 질문에 위치를 붙였으면 coords도 다시 넘긴다 (서버가 좌표를 저장하지 않음)
    */
-  retryMessage: (sessionId: number, messageId: number) =>
-    api<ChatMessageSendResponse>(`${BASE}/sessions/${sessionId}/messages/${messageId}/retry`, { method: 'POST' }),
+  retryExecution: (sessionId: number, executionId: number, coords?: ChatCoordinates) =>
+    api<ChatMessageSendResponse>(`${BASE}/sessions/${sessionId}/executions/${executionId}/retry`, {
+      method: 'POST',
+      ...(coords ? { body: { latitude: coords.latitude, longitude: coords.longitude } } : {}),
+    }),
 
   /** 대화 제목 바꾸기 (공백 제외 1~100자) */
   updateTitle: (sessionId: number, title: string) =>
@@ -78,6 +83,8 @@ export interface ExecutionHandlers {
   onError: (failure: ChatFailure) => void
   /** 서버 이벤트 없이 연결이 끊긴 경우 (네트워크 등) */
   onDisconnect?: () => void
+  /** 진행 상태 알림. 지금은 "RETRYING"(모델 호출이 실패해 서버가 자동으로 다시 시도 중)만 온다 */
+  onStatus?: (status: string) => void
 }
 
 function parseJson<T>(data: unknown): T | null {
@@ -109,6 +116,13 @@ export function subscribeExecution(sessionId: number, executionId: number, handl
     close()
     const state = parseJson<ChatExecutionState>((e as MessageEvent).data)
     if (state) handlers.onComplete(state)
+  })
+
+  // 문자열 그대로 오지만 JSON 문자열("RETRYING")로 와도 받는다. 연결은 닫지 않는다
+  source.addEventListener('status', (e) => {
+    const data = (e as MessageEvent).data
+    if (typeof data !== 'string' || !data) return
+    handlers.onStatus?.(parseJson<string>(data) ?? data)
   })
 
   // 서버가 보낸 error 이벤트에는 data가 있고, 연결 자체의 오류에는 없다
