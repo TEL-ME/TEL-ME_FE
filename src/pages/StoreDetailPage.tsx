@@ -1,17 +1,13 @@
 import { ChevronLeft, Navigation, Phone } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
-import type { StoreDetail } from '../api/stores'
 import StoreEmpty from '../features/stores/components/StoreEmpty'
 import StoreMap from '../features/stores/components/StoreMap'
 import { DAYS, dayOfWeekOf, hoursText, telHref } from '../features/stores/format'
 import { goBack } from '../features/stores/goBack'
 import { useStoreDetail } from '../features/stores/queries'
 import { showToast } from '../stores/toastStore'
-
-/** 카카오맵 길찾기 (앱이 있으면 앱으로, 없으면 웹으로 열린다) */
-const routeUrl = (s: StoreDetail) => `https://map.kakao.com/link/to/${encodeURIComponent(s.name)},${s.latitude},${s.longitude}`
 
 function Frame({ onBack, children }: { onBack: () => void; children: ReactNode }) {
   return (
@@ -191,15 +187,13 @@ export default function StoreDetailPage() {
             전화하기
           </a>
         )}
-        <a
-          href={routeUrl(store)}
-          target="_blank"
-          rel="noreferrer"
+        <Link
+          to={`/stores/${store.storeId}/route`}
           className="flex min-h-[52px] flex-1 items-center justify-center gap-1.5 rounded-2xl bg-brand text-base font-bold text-white no-underline"
         >
           <Navigation size={18} strokeWidth={1.8} aria-hidden />
           길찾기
-        </a>
+        </Link>
       </div>
     </Frame>
   )

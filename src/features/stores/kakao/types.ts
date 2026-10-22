@@ -39,6 +39,10 @@ export interface KakaoOverlay {
   setPosition(position: KakaoLatLng): void
 }
 
+export interface KakaoPolyline {
+  setMap(map: KakaoMap | null): void
+}
+
 export interface KakaoClusterer {
   addMarkers(markers: KakaoMarker[]): void
   clear(): void
@@ -77,6 +81,15 @@ export interface KakaoMaps {
     clickable?: boolean
     map?: KakaoMap
   }) => KakaoOverlay
+  /** strokeStyle: solid · shortdash · dot 등 (https://apis.map.kakao.com/web/documentation/#Polyline) */
+  Polyline: new (options: {
+    path: KakaoLatLng[]
+    strokeWeight?: number
+    strokeColor?: string
+    strokeOpacity?: number
+    strokeStyle?: string
+    zIndex?: number
+  }) => KakaoPolyline
   MarkerClusterer: new (options: {
     map: KakaoMap
     averageCenter?: boolean
