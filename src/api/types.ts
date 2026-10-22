@@ -118,6 +118,17 @@ export interface ChatMessageSendResponse {
   executionStatus?: ExecutionStatus | null
   createdAt: string
   inputGuard?: InputGuardNotice | null
+  /** 게스트가 이 질문을 접수한 뒤 오늘 남은 질문 수 (TELME-213). 회원·제한 꺼짐·입력 검사로 막힌 응답에는 없다 */
+  guestQuestionsRemaining?: number | null
+}
+
+/** 게스트 하루 질문 수 상태 (GET /chat/guest-limit, TELME-213). 회원·제한 꺼짐이면 limited=false, 나머지 null */
+export interface GuestLimitStatus {
+  limited: boolean
+  dailyLimit: number | null
+  remaining: number | null
+  /** 다시 차는 시각 (다음 한국 시간 0시, ISO) */
+  resetsAt: string | null
 }
 
 export interface ChatSource {

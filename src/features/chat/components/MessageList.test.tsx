@@ -84,4 +84,17 @@ describe('MessageList 보내는 중인 질문', () => {
     expect(screen.getByText(GUEST_LIMIT_MESSAGE)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
   })
+
+  it('오늘 질문을 모두 쓴 게스트는 후속 질문 칩을 누를 수 없다', () => {
+    const answer: ChatMessage = {
+      ...userMessage(2, '유심은 매장에서 재발급할 수 있어요.'),
+      sequenceNo: 2,
+      role: 'ASSISTANT',
+      messageType: 'ANSWER',
+      followUps: ['재발급 비용은 얼마예요?'],
+    }
+    wrap(<MessageList {...base} messages={[userMessage(1, '유심 재발급'), answer]} pendingQuestion={null} sentMessageId={null} status="idle" errorMessage={null} askLocked />)
+    expect(screen.getByRole('button', { name: '재발급 비용은 얼마예요?' })).toBeDisabled()
+  })
 })
+

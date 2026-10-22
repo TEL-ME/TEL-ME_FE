@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { liftGuestLimit, markGuestLimited, nextKoreanMidnight, useGuestLimit } from './guestLimitStore'
+import {
+  applyGuestRemaining,
+  applyGuestStatus,
+  liftGuestLimit,
+  markGuestLimited,
+  nextKoreanMidnight,
+  useGuestLimit,
+} from './guestLimitStore'
 
 describe('게스트 하루 질문 수 한도', () => {
   beforeEach(() => liftGuestLimit())
@@ -17,6 +24,30 @@ describe('게스트 하루 질문 수 한도', () => {
     markGuestLimited()
     expect(useGuestLimit.getState().limitedUntil).toBe(nextKoreanMidnight(Date.now()))
     liftGuestLimit()
-    expect(useGuestLimit.getState().limitedUntil).toBeNull()
+    expect(useGuestLimit.getState()).toMatchObject({ limitedUntil: null, remaining: null, resetsAt: null })
+  })
+
+  it('서버가 0이라고 하면 resetsAt까지 잠근다', () => {
+    applyGuestStatus({ limited: true, dailyLimit: 10, remaining: 0, resetsAt: '2099-01-01T15:00:00Z' })
+    expect(useGuestLimit.getState()).toMatchObject({ remaining: 0, limitedUntil: Date.parse('2099-01-01T15:00:00Z') })
+  })
+
+  it('서버 값이 우선: 저장된 잠금이 있어도 남은 수가 있으면 푼다', () => {
+    markGuestLimited()
+    applyGuestStatus({ limited: true, dailyLimit: 10, remaining: 3, resetsAt: '2099-01-01T15:00:00Z' })
+    expect(useGuestLimit.getState()).toMatchObject({ remaining: 3, limitedUntil: null })
+  })
+
+  it('회원·제한 꺼짐이면 아무것도 표시하지 않는다', () => {
+    markGuestLimited()
+    applyGuestStatus({ limited: false, dailyLimit: null, remaining: null, resetsAt: null })
+    expect(useGuestLimit.getState()).toMatchObject({ remaining: null, limitedUntil: null })
+  })
+
+  it('전송 응답의 남은 수: 0이면 잠그고, 없으면(회원) 그대로 둔다', () => {
+    applyGuestRemaining(undefined)
+    expect(useGuestLimit.getState().remaining).toBeNull()
+    applyGuestRemaining(0)
+    expect(useGuestLimit.getState().limitedUntil).toBeGreaterThan(Date.now())
   })
 })

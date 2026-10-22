@@ -8,10 +8,14 @@ import type { ChatMessageHistory } from '../../api/types'
 import { clearAllUnread, notifyAnswer, outcomeOfComplete, shouldNotifyFailure } from './answerNotifier'
 import { coordsForNext, forgetCoordsExcept, rememberCoords } from './heldCoords'
 import {
+  applyGuestRemaining,
   GUEST_DAILY_LIMIT_CODE,
   GUEST_LIMIT_LOGIN_NOTE,
   GUEST_LIMIT_MESSAGE,
+  isGuestLocked,
   markGuestLimited,
+  refreshGuestLimit,
+  useGuestLimit,
 } from './guestLimitStore'
 import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
@@ -85,6 +89,25 @@ function closeStream() {
 }
 
 const NETWORK_MESSAGE = '연결이 불안정해요. 잠시 후 다시 시도해 주세요.'
+
+const isGuestLimitError = (error: unknown) => error instanceof ApiError && error.code === GUEST_DAILY_LIMIT_CODE
+
+/**
+ * 게스트 하루 질문 수에 걸려 거절됐을 때 (CHAT429-0).
+ * 같은 날 다시 보내도 또 거절되므로 입력창을 로그인 안내로 바꾸고, 이번 한 번은 로그인 시트를 바로 띄운다.
+ * 잠금 해제 시각은 서버 값(resetsAt)으로 다시 맞춘다
+ */
+function rejectByGuestLimit() {
+  markGuestLimited()
+  void refreshGuestLimit()
+  set({ status: 'failed', errorMessage: GUEST_LIMIT_MESSAGE, guestLimited: true })
+  openLoginSheet({ subtitle: GUEST_LIMIT_LOGIN_NOTE })
+}
+
+/** 답이 실패하면 그 질문은 세지 않으므로(한도가 1회 돌아온다) 게스트면 남은 수를 다시 받는다 */
+function refreshGuestLimitAfterFailure() {
+  if (useGuestLimit.getState().remaining != null) void refreshGuestLimit()
+}
 
 /** 메시지와 대화 목록(제목·마지막 시간)을 함께 새로 읽는다 */
 const refreshMessages = (sessionId: number) => {
@@ -173,6 +196,7 @@ function subscribe(sessionId: number, executionId: number) {
     },
     onError: async (failure) => {
       reconnectTries = 0
+      refreshGuestLimitAfterFailure()
       const notify = () => {
         if (shouldNotifyFailure(failure)) void notifyAnswer(sessionId, 'failed')
       }
@@ -231,6 +255,12 @@ export async function sendQuestion(
 ) {
   const content = question.trim()
   if (!content || isBusy(get().status)) return
+  // 오늘 질문을 모두 쓴 게스트: 보내 봐야 거절되므로 대화를 만들지 않고 로그인만 안내한다
+  // (입력창·칩은 화면에서 막혀 있고, 다른 화면에서 넘겨받은 질문 등이 여기로 온다)
+  if (isGuestLocked()) {
+    openLoginSheet({ subtitle: GUEST_LIMIT_LOGIN_NOTE })
+    return
+  }
 
   clearInputGuardNotice()
   set({
@@ -242,12 +272,18 @@ export async function sendQuestion(
     guestLimited: false,
   })
   let sessionId = get().sessionId
+  // 새 대화면 질문이 접수된 뒤에 주소를 바꾼다. 첫 질문이 한도에 걸리면 빈 대화로 옮기지 않는다
+  let created: number | null = null
+  const moveToCreated = () => {
+    if (created != null && get().sessionId === created) onSessionCreated?.(created)
+    created = null
+  }
   try {
     if (sessionId == null) {
       const session = await chatApi.createSession()
       sessionId = session.sessionId
+      created = sessionId
       set({ sessionId })
-      onSessionCreated?.(sessionId)
     }
     sendingSessionId = sessionId
     let sendCoords = coords
@@ -257,6 +293,8 @@ export async function sendQuestion(
     const sent = await chatApi.sendMessage(sessionId, content, sendCoords).finally(() => {
       sendingSessionId = null
     })
+    applyGuestRemaining(sent.guestQuestionsRemaining)
+    moveToCreated()
     if (get().sessionId !== sessionId) {
       // 보내는 사이 다른 대화로 옮겼다. 사용 제한은 대화와 상관없이 걸리므로 반영하고, 답변은 백그라운드에서 기다린다
       if (sent.inputGuard?.action === 'RESTRICTED') applyInputGuard(sent.inputGuard)
@@ -278,6 +316,14 @@ export async function sendQuestion(
     }
     listen(sessionId, sent.executionId)
   } catch (error) {
+    if (created != null && get().sessionId === created && isGuestLimitError(error)) {
+      // 새 대화의 첫 질문이 한도에 걸렸다: 빈 대화로 옮기지 않고 홈에 남는다
+      created = null
+      set({ ...initial })
+      rejectByGuestLimit()
+      return
+    }
+    moveToCreated()
     if (get().sessionId !== sessionId) return
     // 이전 답변을 아직 만드는 중이면 그 답변에 다시 붙는다
     if (error instanceof ApiError && error.code === 'CHAT409-3' && sessionId != null) {
@@ -288,13 +334,7 @@ export async function sendQuestion(
         return
       }
     }
-    // 같은 날 다시 보내도 또 거절되므로 입력창을 로그인 안내로 바꾸고, 이번 한 번은 로그인 시트를 바로 띄운다
-    if (error instanceof ApiError && error.code === GUEST_DAILY_LIMIT_CODE) {
-      markGuestLimited()
-      set({ status: 'failed', errorMessage: GUEST_LIMIT_MESSAGE, guestLimited: true })
-      openLoginSheet({ subtitle: GUEST_LIMIT_LOGIN_NOTE })
-      return
-    }
+    if (isGuestLimitError(error)) return rejectByGuestLimit()
     set({ status: 'failed', errorMessage: error instanceof ApiError ? error.message : NETWORK_MESSAGE })
   }
 }
@@ -328,15 +368,21 @@ export async function retryAnswer(
     const coords = lastLocated?.content === question.trim() ? lastLocated.coords : undefined
     return sendQuestion(question, onSessionCreated, coords)
   }
+  if (isGuestLocked()) {
+    openLoginSheet({ subtitle: GUEST_LIMIT_LOGIN_NOTE })
+    return
+  }
   set({ status: 'sending', typingMessageId: null, errorMessage: null })
   try {
     const sent = await chatApi.retryMessage(sessionId, failedMessageId)
+    applyGuestRemaining(sent.guestQuestionsRemaining)
     if (get().sessionId !== sessionId) return
     await refreshMessages(sessionId)
     if (sent.executionId == null) return set({ status: 'idle' })
     listen(sessionId, sent.executionId)
   } catch (error) {
     if (get().sessionId !== sessionId) return
+    if (isGuestLimitError(error)) return rejectByGuestLimit()
     set({ status: 'failed', errorMessage: error instanceof ApiError ? error.message : NETWORK_MESSAGE })
   }
 }

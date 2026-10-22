@@ -29,6 +29,8 @@ interface MessageListProps {
   errorMessage: string | null
   /** 게스트 하루 질문 수에 걸려 거절됐다. 같은 날엔 다시 시도해도 또 거절되므로 다시 시도를 빼고 안내만 한다 (로그인 버튼은 입력창 자리에 있다) */
   guestLimited?: boolean
+  /** 오늘 질문을 모두 쓴 게스트: 질문을 보내는 칩(후속 질문·위치·다른 지역 찾기)을 막는다 */
+  askLocked?: boolean
   onTyped: () => void
   /** coords는 "현재 위치 사용"으로 보낼 때만 있다 */
   onAsk: (question: string, coords?: ChatCoordinates) => void
@@ -69,6 +71,7 @@ export default function MessageList({
   typingMessageId,
   errorMessage,
   guestLimited = false,
+  askLocked = false,
   onTyped,
   onAsk,
   onRetry,
@@ -160,16 +163,16 @@ export default function MessageList({
             after={
               !showExtras || m.messageId !== lastAnswerId ? undefined : m.followUps?.some((s) => s.trim()) ? (
                 // 선택지·추천 질문이 있으면 먼저 그린다 (업무 되묻기는 followUps가 선택지 — 버튼 글자를 그대로 보낸다)
-                <FollowUps items={m.followUps} disabled={busy || closed} onAsk={onAsk} choices={m.messageType === 'CLARIFICATION'} />
+                <FollowUps items={m.followUps} disabled={busy || closed || askLocked} onAsk={onAsk} choices={m.messageType === 'CLARIFICATION'} />
               ) : isLocationAsk(m) && !closed ? (
                 // 어느 지역인지 되물었을 때(선택지 없음): 현재 위치로 답하거나 지도에서 직접 찾는다
-                <LocationAskChips disabled={busy} onAsk={onAsk} />
+                <LocationAskChips disabled={busy || askLocked} locked={askLocked} onAsk={onAsk} />
               ) : undefined
             }
           >
             <AnswerText text={m.content ?? ''} typing={typing} onTyped={onTyped} />
             {showExtras && m.storeResults && m.storeResults.length > 0 && (
-              <StoreResults items={m.storeResults} context={m.storeSearchContext} closed={closed} />
+              <StoreResults items={m.storeResults} context={m.storeSearchContext} closed={closed || askLocked} />
             )}
             {hasSources ? (
               <SourceList messageId={m.messageId} trailing={listen} />

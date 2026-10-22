@@ -7,7 +7,8 @@ import { GUEST_LIMIT_LOGIN_NOTE, GUEST_LIMIT_MESSAGE, liftGuestLimit, useGuestLi
 
 const subs: { sessionId: number; handlers: ExecutionHandlers; stop: ReturnType<typeof vi.fn> }[] = []
 
-const chatApi = { sendMessage: vi.fn() }
+// guestLimitStore도 chatApi를 쓰므로 vi.mock보다 먼저 만든다
+const chatApi = vi.hoisted(() => ({ sendMessage: vi.fn(), createSession: vi.fn(), getGuestLimit: vi.fn() }))
 
 vi.mock('../../api/chat', () => ({
   chatApi,
@@ -170,5 +171,72 @@ describe('게스트가 하루 질문 수를 넘겼을 때 (CHAT429-0)', () => {
     expect(useChatRun.getState()).toMatchObject({ status: 'failed', guestLimited: false })
     expect(useGuestLimit.getState().limitedUntil).toBeNull()
     expect(useLoginSheet.getState().open).toBe(false)
+  })
+})
+
+describe('게스트 남은 질문 수 (TELME-213 후속)', () => {
+  beforeEach(() => {
+    attachSession(null)
+    stopBackgroundStreams()
+    closeLoginSheet()
+    liftGuestLimit()
+    subs.length = 0
+    chatApi.sendMessage.mockReset()
+    chatApi.createSession.mockReset()
+    chatApi.getGuestLimit.mockReset()
+  })
+
+  it('전송 응답의 남은 수로 갱신하고, 0이 되면 다음 질문 전에 바로 잠근다', async () => {
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10, guestQuestionsRemaining: 2 })
+    attachSession(1)
+    await sendQuestion('유심 재발급 비용')
+    expect(useGuestLimit.getState()).toMatchObject({ remaining: 2, limitedUntil: null })
+
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 7, executionId: 11, guestQuestionsRemaining: 0 })
+    useChatRun.setState({ status: 'idle' })
+    await sendQuestion('로밍 신청')
+    expect(useGuestLimit.getState().remaining).toBe(0)
+    expect(useGuestLimit.getState().limitedUntil).toBeGreaterThan(Date.now())
+    // 10번째 질문은 정상 접수라 로그인 시트를 띄우지 않는다
+    expect(useLoginSheet.getState().open).toBe(false)
+  })
+
+  it('잠겨 있으면 서버에 보내지 않고 로그인만 안내한다', async () => {
+    useGuestLimit.setState({ remaining: 0, limitedUntil: Date.now() + 60_000 })
+    attachSession(1)
+    await sendQuestion('유심 재발급 비용')
+    expect(chatApi.sendMessage).not.toHaveBeenCalled()
+    expect(useLoginSheet.getState()).toMatchObject({ open: true, subtitle: GUEST_LIMIT_LOGIN_NOTE })
+  })
+
+  it('새 대화의 첫 질문이 한도에 걸리면 빈 대화로 옮기지 않고 홈에 남는다', async () => {
+    chatApi.createSession.mockResolvedValueOnce({ sessionId: 99 })
+    chatApi.sendMessage.mockRejectedValueOnce(new ApiError(429, 'CHAT429-0', '한도'))
+    chatApi.getGuestLimit.mockResolvedValueOnce({ limited: true, dailyLimit: 10, remaining: 0, resetsAt: '2099-01-01T15:00:00Z' })
+    const moved = vi.fn()
+    await sendQuestion('유심 재발급 비용', moved)
+
+    expect(moved).not.toHaveBeenCalled()
+    expect(useChatRun.getState()).toMatchObject({ sessionId: null, pendingQuestion: null, guestLimited: true })
+    expect(useLoginSheet.getState().open).toBe(true)
+    await vi.waitFor(() => expect(useGuestLimit.getState().limitedUntil).toBe(Date.parse('2099-01-01T15:00:00Z')))
+  })
+
+  it('새 대화는 질문이 접수된 뒤에 주소를 바꾼다', async () => {
+    chatApi.createSession.mockResolvedValueOnce({ sessionId: 99 })
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 99, messageId: 5, executionId: 10, guestQuestionsRemaining: 9 })
+    const moved = vi.fn()
+    await sendQuestion('유심 재발급 비용', moved)
+    expect(moved).toHaveBeenCalledWith(99)
+  })
+
+  it('답이 실패하면(실패한 질문은 세지 않음) 게스트 남은 수를 다시 받는다', async () => {
+    chatApi.sendMessage.mockResolvedValueOnce({ sessionId: 1, messageId: 5, executionId: 10, guestQuestionsRemaining: 4 })
+    chatApi.getGuestLimit.mockResolvedValueOnce({ limited: true, dailyLimit: 10, remaining: 5, resetsAt: '2099-01-01T15:00:00Z' })
+    attachSession(1)
+    await sendQuestion('유심 재발급 비용')
+    await subs[0].handlers.onError({ status: 'FAILED', errorCode: 'MODEL_ERROR', message: '답변을 만들지 못했어요' })
+    expect(chatApi.getGuestLimit).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(useGuestLimit.getState().remaining).toBe(5))
   })
 })

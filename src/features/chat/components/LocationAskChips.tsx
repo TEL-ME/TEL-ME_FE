@@ -9,6 +9,8 @@ import { CHAT_GPS_ENABLED, DECLINE_ANSWER, NEARBY_QUESTION } from '../storeAsk'
 
 interface LocationAskChipsProps {
   disabled: boolean
+  /** 오늘 질문을 모두 쓴 게스트: 지역을 골라도 답으로 보낼 수 없으니 "지역 고르기"도 막는다 */
+  locked?: boolean
   onAsk: (question: string, coords?: ChatCoordinates) => void
 }
 
@@ -19,7 +21,7 @@ const chip =
  * 어느 지역 매장을 찾는지 되물었을 때, 말풍선 아래에 두는 빠른 답.
  * 지역 이름은 입력창에 직접 쓰거나 "지역 고르기"에서 골라도 된다.
  */
-export default function LocationAskChips({ disabled, onAsk }: LocationAskChipsProps) {
+export default function LocationAskChips({ disabled, locked = false, onAsk }: LocationAskChipsProps) {
   const [locating, setLocating] = useState(false)
   const { pathname } = useLocation()
 
@@ -46,10 +48,17 @@ export default function LocationAskChips({ disabled, onAsk }: LocationAskChipsPr
         </button>
       )}
       {/* 지역을 고르면 그 이름을 이 대화에 답으로 보낸다 (askChat: 답을 보낼 대화 주소) */}
-      <Link to="/stores/region" state={{ askChat: pathname, asAnswer: true }} className={chip}>
-        <MapIcon size={15} strokeWidth={2} aria-hidden />
-        지역 고르기
-      </Link>
+      {locked ? (
+        <button type="button" disabled className={chip}>
+          <MapIcon size={15} strokeWidth={2} aria-hidden />
+          지역 고르기
+        </button>
+      ) : (
+        <Link to="/stores/region" state={{ askChat: pathname, asAnswer: true }} className={chip}>
+          <MapIcon size={15} strokeWidth={2} aria-hidden />
+          지역 고르기
+        </Link>
+      )}
       <button type="button" disabled={disabled || locating} onClick={() => onAsk(DECLINE_ANSWER)} className={chip}>
         {DECLINE_ANSWER}
       </button>
