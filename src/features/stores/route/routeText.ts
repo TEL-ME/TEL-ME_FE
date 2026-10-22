@@ -1,4 +1,4 @@
-import type { RouteMode, RouteStepType, StoreRoute } from '../../../api/stores'
+import type { RouteMode, RouteStep, RouteStepType, StoreRoute } from '../../../api/stores'
 
 export const ROUTE_MODES: { mode: RouteMode; label: string }[] = [
   { mode: 'TRANSIT', label: '대중교통' },
@@ -46,4 +46,34 @@ export function transfersText(transfers: number | null): string | null {
 /** 출발지와 매장이 같은 곳이라 갈 필요가 없을 때의 성공 응답 */
 export function isArrived(route: StoreRoute): boolean {
   return route.distanceMeters === 0 && route.durationSeconds === 0 && route.steps.length === 0
+}
+
+/** 지도에 그릴 수 있는 좌표만 */
+export function stepPoints(step: RouteStep) {
+  return step.path.filter((c) => Number.isFinite(c.latitude) && Number.isFinite(c.longitude))
+}
+
+/**
+ * 누르면 지도에서 그 구간을 보여 주는 단계: 좌표가 두 개 이상인 버스·지하철·도보·자전거.
+ * 자동차는 단계가 하나뿐이라 전체 경로와 같아서 뺀다
+ */
+export function isFocusable(step: RouteStep): boolean {
+  return step.type !== 'DRIVE' && stepPoints(step).length >= 2
+}
+
+/** 고른 구간 양 끝 이름표. 버스·지하철은 승차·하차, 걷거나 자전거로 가는 구간은 출발·도착 */
+export function endLabels(step: RouteStep): { start: string; end: string } {
+  return step.type === 'BUS' || step.type === 'SUBWAY' ? { start: '승차', end: '하차' } : { start: '출발', end: '도착' }
+}
+
+/**
+ * 타는 곳·내리는 곳 이름. 카카오 안내 문구 끝의 "(원효로제1동주민센터 > 순천향대학병원.한남오거리)"에서 꺼낸다.
+ * 문구 형식이 다르면 null (지도에는 "승차"·"하차"로만 표시한다)
+ */
+export function stopNames(step: RouteStep): { from: string; to: string } | null {
+  const match = step.guidance?.match(/\(([^()]+?)\s*>\s*([^()]+?)\)\s*$/)
+  if (!match) return null
+  const from = match[1].trim()
+  const to = match[2].trim()
+  return from && to ? { from, to } : null
 }
