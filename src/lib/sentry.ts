@@ -23,8 +23,15 @@ export function initSentry() {
 }
 
 /** API가 500번대로 응답했을 때 한 건 보낸다. 같은 API·상태끼리 묶이도록 경로의 숫자 ID는 :id로 바꾼다 */
+/**
+ * 5xx지만 장애가 아니라 운영 상태를 알리는 응답. 오류로 쌓이면 진짜 장애를 가리므로 보내지 않는다
+ * - STORE503-3: 운영자가 길찾기를 꺼 둠 · STORE503-4: 이동 수단의 하루 호출 예산 소진
+ */
+const EXPECTED_5XX_CODES = new Set(['STORE503-3', 'STORE503-4'])
+
 export function reportServerError(method: string, path: string, status: number, code?: string) {
   if (status < 500) return
+  if (code && EXPECTED_5XX_CODES.has(code)) return
   const route = normalizePath(path)
   const error = new Error(`${method} ${route} → ${status}`)
   error.name = 'ApiServerError'

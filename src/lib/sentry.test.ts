@@ -41,6 +41,18 @@ describe('API 오류 수집', () => {
     expect(sentry.captureException).not.toHaveBeenCalled()
   })
 
+  it('길찾기 운영 상태 503(꺼짐 STORE503-3 · 예산 소진 STORE503-4)은 보내지 않고, 연동 실패 STORE503-2는 보낸다', async () => {
+    respond(503, { isSuccess: false, code: 'STORE503-4', message: '오늘 제공량을 모두 사용했습니다' })
+    await expect(api('/api/v1/stores/7/route')).rejects.toBeInstanceOf(ApiError)
+    respond(503, { isSuccess: false, code: 'STORE503-3', message: '길찾기를 잠시 이용할 수 없습니다' })
+    await expect(api('/api/v1/stores/7/route')).rejects.toBeInstanceOf(ApiError)
+    expect(sentry.captureException).not.toHaveBeenCalled()
+
+    respond(503, { isSuccess: false, code: 'STORE503-2', message: '연동 실패' })
+    await expect(api('/api/v1/stores/7/route')).rejects.toBeInstanceOf(ApiError)
+    expect(sentry.captureException).toHaveBeenCalledTimes(1)
+  })
+
   it('reportServerError는 500 미만이면 무시한다', () => {
     reportServerError('GET', '/api/v1/x', 499)
     expect(sentry.captureException).not.toHaveBeenCalled()
