@@ -4,7 +4,7 @@ import { adminSystemApi, taskLabel, VISIBLE_TASKS, type LlmErrorType, type LlmTa
 import { formatAdminTime } from '../../../lib/date'
 import { Badge, Card, Chip, Empty, FilterSelect, Pager, TableHead } from '../components/AdminUi'
 import { PERIODS, periodFrom, type Period } from '../periods'
-import { formatMs } from './format'
+import { formatMs, isKeyDetail, splitLlmError } from './format'
 
 const ERROR_TYPES: [LlmErrorType, string][] = [
   ['TIMEOUT', '시간 초과'],
@@ -85,10 +85,7 @@ export default function LlmErrorsPanel() {
             </span>
             <span className="text-ink-sub">{e.attempt}회차</span>
             <span className="text-ink-sub">{formatMs(e.totalMs)}</span>
-            <span className="truncate text-ink-sub" title={e.errorMessage ?? undefined}>
-              {e.errorMessage || '—'}
-              {e.model && <span className="ml-1.5 text-xs text-ink-muted">({e.model})</span>}
-            </span>
+            <ErrorMessage message={e.errorMessage} model={e.model} />
             <span className="text-xs text-ink-muted">{e.executionId ? `#${e.executionId}` : '—'}</span>
           </div>
         ))}
@@ -97,5 +94,37 @@ export default function LlmErrorsPanel() {
         )}
       </Card>
     </>
+  )
+}
+
+/**
+ * 메시지 칸: 실패 원인(종료 사유 등) → 오류 문구(두 줄까지) → 모델 이름 순서.
+ * 원인과 모델이 긴 문구 뒤에서 잘리지 않게 따로 줄을 둔다. 툴팁에는 전체 메시지와 모델을 함께 넣는다
+ */
+function ErrorMessage({ message, model }: { message: string | null; model: string | null }) {
+  const { code, text, details } = splitLlmError(message)
+  const title = [message, model && `모델: ${model}`].filter(Boolean).join('\n') || undefined
+  return (
+    <span className="flex min-w-0 flex-col gap-1 py-0.5" title={title}>
+      {details.length > 0 && (
+        <span className="flex flex-wrap gap-1">
+          {details.map((d) => (
+            <span
+              key={d}
+              className={`rounded-md px-1.5 py-px font-mono text-[11px] leading-4 ${
+                isKeyDetail(d) ? 'bg-notice font-bold text-notice-text' : 'bg-surface-2 text-ink-sub'
+              }`}
+            >
+              {d}
+            </span>
+          ))}
+        </span>
+      )}
+      <span className="line-clamp-2 break-words leading-5 text-ink-sub">
+        {code && <span className="mr-1 font-mono text-xs text-ink-muted">{code}</span>}
+        {text || (code ? '' : '—')}
+      </span>
+      {model && <span className="truncate font-mono text-[11px] leading-4 text-ink-muted">{model}</span>}
+    </span>
   )
 }
