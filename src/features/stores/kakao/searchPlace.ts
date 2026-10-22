@@ -38,3 +38,25 @@ export async function searchPlace(query: string): Promise<PlaceHit | null> {
   if (hit?.kind === 'place' && !(Number.isFinite(hit.center.lat) && Number.isFinite(hit.center.lng))) return null
   return hit
 }
+
+/**
+ * 길찾기 출발지로 쓸 한 지점을 찾는다. 지명이어도 좌표가 필요하므로 장소 이름을 먼저 보고, 없으면 주소의 대표 좌표를 쓴다.
+ * 못 찾으면 null.
+ */
+export async function searchPoint(query: string): Promise<{ label: string; center: LatLng } | null> {
+  const keyword = query.trim()
+  if (!keyword) return null
+  const maps = await loadKakao()
+  const place = await searchKeyword(maps, keyword)
+  if (place?.kind === 'place' && Number.isFinite(place.center.lat) && Number.isFinite(place.center.lng)) {
+    return { label: place.label, center: place.center }
+  }
+  const address = await new Promise<{ label: string; center: LatLng } | null>((resolve) => {
+    new maps.services.Geocoder().addressSearch(keyword, (result, status) => {
+      const first = status === maps.services.Status.OK ? result[0] : undefined
+      const center = first ? { lat: Number(first.y), lng: Number(first.x) } : null
+      resolve(first && center && Number.isFinite(center.lat) && Number.isFinite(center.lng) ? { label: first.address_name, center } : null)
+    })
+  })
+  return address
+}

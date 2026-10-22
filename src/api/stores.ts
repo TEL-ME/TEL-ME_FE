@@ -91,6 +91,50 @@ export interface RegionQuery {
   size?: number
 }
 
+// ---- 길찾기 (TELME-189: GET /stores/{storeId}/route) ----
+
+/** 이동 수단. 고른 수단 하나만 조회한다 */
+export type RouteMode = 'CAR' | 'TRANSIT' | 'WALK' | 'BICYCLE'
+
+/** 경로 한 단계의 종류. 대중교통은 WALK · BUS · SUBWAY가 섞여 온다 */
+export type RouteStepType = 'DRIVE' | 'WALK' | 'BICYCLE' | 'BUS' | 'SUBWAY'
+
+export interface RouteCoordinate {
+  latitude: number
+  longitude: number
+}
+
+export interface RouteStep {
+  type: RouteStepType
+  guidance: string | null
+  distanceMeters: number
+  durationSeconds: number
+  /** 버스 번호·지하철 노선. BUS · SUBWAY 단계에만 값이 있다 */
+  lineName: string | null
+  /** 지도에 그릴 좌표. 비어 있을 수 있다 */
+  path: RouteCoordinate[]
+}
+
+export interface StoreRoute {
+  mode: RouteMode
+  distanceMeters: number
+  durationSeconds: number
+  /** 대중교통만 값이 있다. null은 무료가 아니라 "정보 없음" */
+  fare: number | null
+  /** 대중교통만 값이 있다. 0은 환승 없음, null은 정보 없음 */
+  transfers: number | null
+  /** 출발지와 매장이 같은 곳이면 거리·시간 0에 빈 배열 */
+  steps: RouteStep[]
+}
+
+export interface RouteQuery {
+  mode: RouteMode
+  /** 33~39 (대한민국 범위) */
+  originLatitude: number
+  /** 124~132 */
+  originLongitude: number
+}
+
 const BASE = '/api/v1/stores'
 
 export const storeApi = {
@@ -105,4 +149,13 @@ export const storeApi = {
   detail: (storeId: number, signal?: AbortSignal) => api<StoreDetail>(`${BASE}/${storeId}`, { signal }),
 
   serviceTypes: () => api<{ serviceTypes: StoreServiceType[] }>(`${BASE}/service-types`),
+
+  /**
+   * 현재 위치(출발지)에서 매장까지 경로. 목적지 좌표는 서버가 매장 DB에서 읽는다.
+   * 요청마다 카카오 호출 예산을 쓰므로 자동 재시도·캐시 없이 필요할 때만 부른다.
+   * 실패 코드: STORE400-5(최대 거리 초과) · STORE404-0(매장 없음) · STORE404-1(경로 없음)
+   *          · STORE503-2(연동 실패) · STORE503-3(길찾기 꺼짐) · STORE503-4(수단별 하루 예산 소진)
+   */
+  route: (storeId: number, q: RouteQuery, signal?: AbortSignal) =>
+    api<StoreRoute>(`${BASE}/${storeId}/route`, { query: { ...q }, signal }),
 }

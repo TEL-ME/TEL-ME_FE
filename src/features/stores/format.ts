@@ -81,3 +81,8 @@ export function hoursText(hours: StoreHours | undefined): string {
 export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, '')}`
 }
+
+/** 카카오맵 길찾기 링크 (앱이 있으면 앱으로, 없으면 웹으로 열린다). 우리 길찾기를 못 쓸 때의 대안이다 */
+export function kakaoRouteUrl(store: { name: string; latitude: number; longitude: number }): string {
+  return `https://map.kakao.com/link/to/${encodeURIComponent(store.name)},${store.latitude},${store.longitude}`
+}

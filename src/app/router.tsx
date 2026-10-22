@@ -26,6 +26,7 @@ import SettingsPage from '../pages/SettingsPage'
 import SignupPage from '../pages/SignupPage'
 import SocialMatchPage from '../pages/SocialMatchPage'
 import StoreDetailPage from '../pages/StoreDetailPage'
+import StoreRoutePage from '../pages/StoreRoutePage'
 import StoreRegionPage from '../pages/StoreRegionPage'
 import StoresPage from '../pages/StoresPage'
 import { RouteErrorScreen } from './ErrorScreen'
@@ -42,6 +43,7 @@ const routes: RouteObject[] = [
       { path: '/stores', element: <StoresPage /> },
       { path: '/stores/region', element: <StoreRegionPage /> },
       { path: '/stores/:storeId', element: <StoreDetailPage /> },
+      { path: '/stores/:storeId/route', element: <StoreRoutePage /> },
       // 자주 묻는 질문. ?id=로 오면 그 FAQ를 맨 위에 펼친다
       { path: '/faq', element: <FaqPage /> },
       { path: '/my', element: <MyPage /> },
