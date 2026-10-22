@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { track } from '../../../lib/analytics'
 import { useAllPlans } from '../../plans/queries'
 import { parsePlanTaskLink, planTaskHref } from '../planTaskLinks'
 
@@ -25,7 +26,9 @@ export default function FollowUps({ items, disabled, onAsk, choices = false }: F
   const plans = useAllPlans(links.some((s) => parsePlanTaskLink(s)?.planName))
   const go = (label: string) => {
     const link = parsePlanTaskLink(label)
-    if (link) navigate(planTaskHref(link, plans.data ?? []))
+    if (!link) return
+    track('plan_link_click', { label })
+    navigate(planTaskHref(link, plans.data ?? []))
   }
   const list = choices ? questions : questions.slice(0, 3)
   if (list.length === 0 && links.length === 0) return null

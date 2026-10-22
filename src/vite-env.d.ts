@@ -17,6 +17,10 @@ interface ImportMetaEnv {
   readonly VITE_CLARITY_ENABLED?: string
   readonly VITE_CLARITY_PROJECT_ID?: string
   readonly VITE_CLARITY_ENVIRONMENT?: 'local' | 'beta'
+  /** GA4 측정 ID(G-로 시작). 비우면 사용자 행동을 수집하지 않는다 */
+  readonly VITE_GA_MEASUREMENT_ID?: string
+  /** true면 GA DebugView에 보이도록 debug_mode를 켠다 (로컬 확인용, 배포에서는 비움) */
+  readonly VITE_GA_DEBUG?: string
 }
 
 interface ImportMeta {

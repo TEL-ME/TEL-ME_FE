@@ -9,6 +9,7 @@ import { coordsForNext, forgetCoordsExcept, rememberCoords } from './heldCoords'
 import { applyInputGuard, clearInputGuardNotice } from './inputGuardStore'
 import { fetchMessages, messagesKey } from './queries'
 import { sessionsKey } from './sessionQueries'
+import { track } from '../../lib/analytics'
 
 /**
  * 채팅 상태 (문서 3. 채팅 상태)
@@ -229,6 +230,7 @@ export async function sendQuestion(
     if (sessionId == null) {
       const session = await chatApi.createSession()
       sessionId = session.sessionId
+      track('consult_start')
       set({ sessionId })
       onSessionCreated?.(sessionId)
     }
@@ -240,6 +242,7 @@ export async function sendQuestion(
     const sent = await chatApi.sendMessage(sessionId, content, sendCoords).finally(() => {
       sendingSessionId = null
     })
+    track('question_send')
     if (get().sessionId !== sessionId) {
       // 보내는 사이 다른 대화로 옮겼다. 사용 제한은 대화와 상관없이 걸리므로 반영하고, 답변은 백그라운드에서 기다린다
       if (sent.inputGuard?.action === 'RESTRICTED') applyInputGuard(sent.inputGuard)
