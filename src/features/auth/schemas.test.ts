@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { signupSchema } from './schemas'
 
-const base = { name: '홍길동', email: 'a@b.co', password: 'password1', passwordConfirm: 'password1', agreeTerms: true, agreePrivacy: true }
+const base = { name: '홍길동', email: 'a@b.co', password: 'password1', passwordConfirm: 'password1', agreePrivacy: true }
 
 describe('signupSchema', () => {
   it('올바른 입력은 통과', () => {

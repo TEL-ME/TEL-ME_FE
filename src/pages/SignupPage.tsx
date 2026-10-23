@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Check, CircleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import TextField from '../components/TextField'
@@ -58,11 +58,10 @@ export default function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { name: '', email: '', password: '', passwordConfirm: '', agreeTerms: false, agreePrivacy: false },
+    defaultValues: { name: '', email: '', password: '', passwordConfirm: '', agreePrivacy: false },
   })
-  const [agreeTerms, agreePrivacy] = useWatch({ control, name: ['agreeTerms', 'agreePrivacy'] })
-  const all = agreeTerms && agreePrivacy
-  const toggle = (k: 'agreeTerms' | 'agreePrivacy', v: boolean) => setValue(k, v, { shouldValidate: !!errors.agreeTerms })
+  const agreePrivacy = useWatch({ control, name: 'agreePrivacy' })
+  const toggle = (v: boolean) => setValue('agreePrivacy', v, { shouldValidate: !!errors.agreePrivacy })
 
   const onSubmit = handleSubmit(async ({ name, email, password }) => {
     try {
@@ -155,38 +154,22 @@ export default function SignupPage() {
         <div className="flex flex-col gap-2">
           <div className="flex flex-col rounded-[18px] bg-surface px-3.5 py-1">
             <CheckRow
-              strong
-              checked={all}
-              onToggle={() => {
-                toggle('agreeTerms', !all)
-                toggle('agreePrivacy', !all)
-              }}
-              label="약관 전체 동의"
-            />
-            <div className="my-0.5 h-px bg-surface-2" />
-            <CheckRow
-              checked={agreeTerms}
-              onToggle={() => toggle('agreeTerms', !agreeTerms)}
-              label={
-                <>
-                  이용약관 동의 <span className="font-medium text-ink-sub">(필수)</span>
-                </>
-              }
-            />
-            <CheckRow
               checked={agreePrivacy}
-              onToggle={() => toggle('agreePrivacy', !agreePrivacy)}
+              onToggle={() => toggle(!agreePrivacy)}
               label={
                 <>
                   개인정보 수집·이용 동의 <span className="font-medium text-ink-sub">(필수)</span>
                 </>
               }
             />
+            <Link to="/privacy" className="-mt-1 mb-1.5 ml-8 self-start text-[13px] font-medium text-ink-sub underline underline-offset-[3px]">
+              개인정보처리방침 보기
+            </Link>
           </div>
-          {(errors.agreeTerms?.message || errors.root?.message) && (
+          {(errors.agreePrivacy?.message || errors.root?.message) && (
             <p role="alert" className="flex gap-1.5 px-1 text-[13px] font-semibold leading-[18px] text-danger">
               <CircleAlert size={16} strokeWidth={2} aria-hidden className="mt-px shrink-0" />
-              <span>{errors.agreeTerms?.message ?? errors.root?.message}</span>
+              <span>{errors.agreePrivacy?.message ?? errors.root?.message}</span>
             </p>
           )}
         </div>

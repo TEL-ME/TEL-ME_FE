@@ -135,4 +135,35 @@ describe('MessageList 실패한 답변 다시 시도 (TELME-219)', () => {
     expect(screen.getAllByRole('status')).toHaveLength(1)
     expect(screen.getByText('답변 생성이 지연돼 다시 시도하고 있어요')).toBeInTheDocument()
   })
+
+  it('FAQ 근거 없음 답변(handoff)이면 고객센터 연결 버튼을 붙이고, 누르면 연락 방법 창을 띄운다', () => {
+    const answer = (handoff: boolean): ChatMessage => ({
+      ...userMessage(handoff ? 2 : 4, '확인된 정보가 없어요.'),
+      sequenceNo: handoff ? 2 : 4,
+      role: 'ASSISTANT',
+      messageType: 'ANSWER',
+      answerBasis: 'NO_EVIDENCE',
+      handoff,
+    })
+    wrap(
+      <MessageList
+        {...base}
+        messages={[userMessage(1, '질문'), answer(true), { ...userMessage(3, '질문2'), sequenceNo: 3 }, answer(false)]}
+        pendingQuestion={null}
+        sentMessageId={null}
+        status="idle"
+        errorMessage={null}
+      />,
+    )
+    // 근거 없음 답변 하나에만 연결 버튼이 붙고, 누르면 연락 방법 창이 열린다
+    const buttons = screen.getAllByRole('button', { name: '고객센터 연결' })
+    expect(buttons).toHaveLength(1)
+    fireEvent.click(buttons[0])
+    expect(screen.getByRole('dialog', { name: '상담원에게 물어보세요' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /가까운 매장 방문/ })).toHaveAttribute('href', '/stores')
+    expect(screen.getByRole('link', { name: /자주 묻는 질문 보기/ })).toHaveAttribute('href', '/faq')
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })
+

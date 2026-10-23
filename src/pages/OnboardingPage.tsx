@@ -1,6 +1,6 @@
 import { Mail } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { setLoginReturn } from '../features/auth/loginSheetStore'
 import { SocialIcon } from '../features/auth/SocialIcon'
 import { SOCIAL_PROVIDERS, startSocialLogin } from '../features/auth/socialProviders'
@@ -14,9 +14,11 @@ const NEXT_LABEL = ['반가워, 무러바라!', '다음', '다음']
 function Terms() {
   return (
     <p className="text-center text-[13px] leading-5 text-ink-muted">
-      계속하면 <u>이용약관</u>과 <u>개인정보처리방침</u>에
-      <br />
-      동의하게 됩니다.
+      계속하면{' '}
+      <Link to="/privacy" className="underline underline-offset-[3px]">
+        개인정보처리방침
+      </Link>
+      에 동의하게 됩니다.
     </p>
   )
 }
