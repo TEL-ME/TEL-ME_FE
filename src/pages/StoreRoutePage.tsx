@@ -10,17 +10,21 @@ import { searchPoint } from '../features/stores/kakao/searchPlace'
 import { canLocate, locateErrorMessage, locateMe } from '../features/stores/locate'
 import { useStoreDetail } from '../features/stores/queries'
 import RouteMap from '../features/stores/route/RouteMap'
+import RouteAlternatives from '../features/stores/route/RouteAlternatives'
+import TransitSteps from '../features/stores/route/TransitSteps'
 import { routeErrorView } from '../features/stores/route/routeError'
 import {
   durationText,
   fareText,
   isArrived,
   isFocusable,
+  needsOriginWalkCheck,
   ROUTE_MODES,
   STEP_LABEL,
   transfersText,
 } from '../features/stores/route/routeText'
 import { useStoreRoute } from '../features/stores/route/useStoreRoute'
+import { useOriginWalk } from '../features/stores/route/useOriginWalk'
 
 interface Origin {
   center: LatLng
@@ -116,9 +120,19 @@ export default function StoreRoutePage() {
   const [originError, setOriginError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
-  /** 지도에서 보고 있는 단계. 어느 결과(seq)의 몇 번째 단계인지 함께 들고 있어, 새 결과가 오면 저절로 풀린다 */
-  const [focus, setFocus] = useState<{ seq: number; index: number } | null>(null)
+  /** 결과(seq)와 경로 번호를 함께 구분해, 새 결과나 다른 경로에 이전 선택이 넘어가지 않게 한다 */
+  const [selection, setSelection] = useState<{ seq: number; index: number } | null>(null)
+  const [focus, setFocus] = useState<{ seq: number; routeIndex: number; index: number; indices?: number[]; firstStep?: RouteStep } | null>(null)
   const mapRef = useRef<HTMLDivElement>(null)
+  const rawRoutes = useMemo(() => state.status === 'success' && state.mode === mode
+    ? [state.data, ...(mode === 'TRANSIT' && !isArrived(state.data) ? state.data.alternatives ?? [] : [])]
+    : [], [state, mode])
+  const result = state.status !== 'idle' && state.mode === mode ? state : null
+  const selectedIndex = result?.status === 'success' && selection?.seq === result.seq && selection.index < rawRoutes.length
+    ? selection.index : 0
+  const originWalk = useOriginWalk(storeId, origin?.center ?? null, rawRoutes, selectedIndex)
+  const routes = originWalk.routes
+  const selectedRoute = routes[selectedIndex] ?? null
 
   const back = () => goBack(navigate, storeId ? `/stores/${storeId}` : '/stores')
 
@@ -238,13 +252,24 @@ export default function StoreRoutePage() {
     </a>
   )
 
-  const result = state.status !== 'idle' && state.mode === mode ? state : null
-  const focusIndex = result?.status === 'success' && focus?.seq === result.seq ? focus.index : null
+  const focusIndex = result?.status === 'success' && focus?.seq === result.seq && focus.routeIndex === selectedIndex && focus.firstStep === selectedRoute?.steps[0] ? focus.index : null
+  const focusedIndices = focusIndex != null ? focus?.indices ?? [focusIndex] : []
+  const selectRoute = (index: number) => {
+    if (result?.status !== 'success') return
+    setSelection({ seq: result.seq, index })
+    setFocus(null)
+  }
   /** 단계를 누르면 그 구간을 지도에 보여 주고, 다시 누르면 전체 경로로 돌아간다. 목록이 길면 지도가 보이게 올린다 */
   const selectStep = (seq: number, index: number) => {
-    const next = focusIndex === index ? null : { seq, index }
+    const next = focusIndex === index ? null : { seq, routeIndex: selectedIndex, index, firstStep: selectedRoute?.steps[0] }
     setFocus(next)
     if (next) mapRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }
+  const selectTransitSteps = (indices: number[]) => {
+    if (result?.status !== 'success' || !indices.length) return
+    const same = indices.length === focusedIndices.length && indices.every((index) => focusedIndices.includes(index))
+    setFocus(same ? null : { seq: result.seq, routeIndex: selectedIndex, index: indices[0], indices, firstStep: selectedRoute?.steps[0] })
+    if (!same) mapRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
   }
 
   return (
@@ -273,6 +298,8 @@ export default function StoreRoutePage() {
             <span className="min-w-0 flex-1 truncate font-semibold">{store.name}</span>
           </div>
           {hasKakaoKey && (
+            <details open={mode === 'TRANSIT' && origin ? undefined : true}>
+            <summary className={mode === 'TRANSIT' && origin ? 'cursor-pointer py-1 text-xs font-semibold text-ink-sub' : 'hidden'}>출발지 변경</summary>
             <form onSubmit={(e) => void search(e)} className="mt-1 flex gap-2">
               <input
                 value={query}
@@ -289,6 +316,7 @@ export default function StoreRoutePage() {
                 검색
               </button>
             </form>
+            </details>
           )}
           {originError && (
             <p role="alert" className="text-[13px] leading-5 text-danger">
@@ -319,12 +347,18 @@ export default function StoreRoutePage() {
             <RouteMap
               origin={origin.center}
               destination={destination}
-              route={result?.status === 'success' ? result.data : null}
+              route={selectedRoute}
               fitKey={result?.status === 'success' ? result.seq : 0}
               focusIndex={focusIndex}
+              focusIndices={mode === 'TRANSIT' ? focusedIndices : undefined}
+              routes={mode === 'TRANSIT' ? routes : undefined}
+              selectedIndex={selectedIndex}
+              onSelectRoute={selectRoute}
             />
           </div>
         )}
+
+        {routes.length > 1 && <RouteAlternatives routes={routes} selectedIndex={selectedIndex} onSelect={selectRoute} />}
 
         {result?.status === 'loading' && (
           <div role="status" aria-label="경로를 찾는 중" className="flex flex-col gap-2">
@@ -333,21 +367,32 @@ export default function StoreRoutePage() {
           </div>
         )}
 
-        {result?.status === 'success' &&
-          (isArrived(result.data) ? (
+        {result?.status === 'success' && selectedRoute &&
+          (isArrived(selectedRoute) ? (
             <p className="rounded-card bg-surface p-4 text-center text-[15px] font-semibold">이미 매장 근처에 있어요.</p>
           ) : (
-            <section className="flex flex-col rounded-card bg-surface px-4 pb-2 pt-4">
+            <section aria-label="선택한 경로 안내" className="flex flex-col rounded-card bg-surface px-4 pb-2 pt-4">
+              {mode === 'TRANSIT' && <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-bold">이동 안내</h2>
+                {focusIndex != null ? <button type="button" onClick={() => setFocus(null)} className="min-h-8 text-xs font-bold text-brand-text">전체 경로</button>
+                  : <span className="text-xs text-ink-muted">구간을 눌러 지도 확인</span>}
+              </div>}
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-2xl font-extrabold tracking-[-0.5px]">{durationText(result.data.durationSeconds)}</span>
-                <span className="text-sm text-ink-sub">{formatDistance(result.data.distanceMeters)}</span>
-                {fareText(result.data.fare) && <span className="text-sm text-ink-sub">· {fareText(result.data.fare)}</span>}
-                {transfersText(result.data.transfers) && (
-                  <span className="text-sm text-ink-sub">· {transfersText(result.data.transfers)}</span>
+                <span className="text-2xl font-extrabold tracking-[-0.5px]">{durationText(selectedRoute.durationSeconds)}</span>
+                <span className="text-sm text-ink-sub">{formatDistance(selectedRoute.distanceMeters)}</span>
+                {fareText(selectedRoute.fare) && <span className="text-sm text-ink-sub">· {fareText(selectedRoute.fare)}</span>}
+                {transfersText(selectedRoute.transfers) && (
+                  <span className="text-sm text-ink-sub">· {transfersText(selectedRoute.transfers)}</span>
                 )}
               </div>
-              <ol aria-label="단계별 안내" className="mt-1 divide-y divide-surface-2">
-                {result.data.steps.map((step, i) => (
+              {origin && needsOriginWalkCheck(selectedRoute, origin.center) && (
+                <p className="mt-2 text-xs leading-5 text-ink-sub">
+                  {originWalk.status === 'loading' ? '첫 정류장까지 도보를 찾는 중…' : originWalk.status === 'error' ? '출발 도보를 불러오지 못했어요.' : '첫 정류장까지 도보는 별도 확인해 주세요.'}
+                  {originWalk.status === 'error' && routeErrorView(originWalk.error, 'WALK').canRetry && <button type="button" onClick={originWalk.retry} className="ml-2 min-h-8 font-bold text-brand-text">도보 다시 시도</button>}
+                </p>
+              )}
+              {mode === 'TRANSIT' ? <TransitSteps key={`${result.seq}:${selectedIndex}`} steps={selectedRoute.steps} focusedIndices={focusedIndices} onSelect={selectTransitSteps} /> : <ol aria-label="단계별 안내" className="mt-1 divide-y divide-surface-2">
+                {selectedRoute.steps.map((step, i) => (
                   <StepItem
                     key={i}
                     step={step}
@@ -355,7 +400,7 @@ export default function StoreRoutePage() {
                     onSelect={isFocusable(step) ? () => selectStep(result.seq, i) : undefined}
                   />
                 ))}
-              </ol>
+              </ol>}
             </section>
           ))}
 

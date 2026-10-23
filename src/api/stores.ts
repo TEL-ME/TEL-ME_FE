@@ -125,6 +125,10 @@ export interface StoreRoute {
   transfers: number | null
   /** 출발지와 매장이 같은 곳이면 거리·시간 0에 빈 배열 */
   steps: RouteStep[]
+  /** 대중교통의 출발지 도보 보강 여부. 다른 수단은 null, 구버전 응답은 생략 */
+  originWalkIncluded?: boolean | null
+  /** 첫 추천 경로를 제외한 대체 경로. 서버 추천 순서이며 구버전 응답은 생략 */
+  alternatives?: StoreRoute[]
 }
 
 export interface RouteQuery {
@@ -133,6 +137,13 @@ export interface RouteQuery {
   originLatitude: number
   /** 124~132 */
   originLongitude: number
+}
+
+export interface OriginWalkQuery {
+  originLatitude: number
+  originLongitude: number
+  destinationLatitude: number
+  destinationLongitude: number
 }
 
 const BASE = '/api/v1/stores'
@@ -158,4 +169,8 @@ export const storeApi = {
    */
   route: (storeId: number, q: RouteQuery, signal?: AbortSignal) =>
     api<StoreRoute>(`${BASE}/${storeId}/route`, { query: { ...q }, signal }),
+
+  /** 선택한 경로의 첫 좌표까지 도보. WALK 예산을 사용하므로 화면에서 중복 요청을 합친다 */
+  originWalk: (storeId: number, q: OriginWalkQuery, signal?: AbortSignal) =>
+    api<StoreRoute>(`${BASE}/${storeId}/route/origin-walk`, { query: { ...q }, signal }),
 }
