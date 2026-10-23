@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../../api/client'
 import { routeErrorView } from './routeError'
 import type { RouteStep } from '../../../api/stores'
-import { durationText, endLabels, fareText, isArrived, isFocusable, stopNames, transfersText } from './routeText'
+import { durationText, endLabels, fareText, groupTransitSteps, isArrived, isFocusable, needsOriginWalkCheck, routeLinesText, stopNames, transfersText } from './routeText'
 
 describe('길찾기 문구', () => {
   it('시간', () => {
@@ -84,5 +84,35 @@ describe('단계 구간 보기', () => {
   it('버스·지하철은 승차·하차, 도보·자전거는 출발·도착으로 표시한다', () => {
     expect(endLabels(step({}))).toEqual({ start: '승차', end: '하차' })
     expect(endLabels(step({ type: 'WALK' }))).toEqual({ start: '출발', end: '도착' })
+  })
+
+  it('노선 요약은 도보를 빼고 탑승 순서를 유지하며, 같은 노선 재탑승도 생략하지 않는다', () => {
+    expect(routeLinesText([
+      step({ type: 'WALK', lineName: null }),
+      step({ lineName: '145' }),
+      step({ type: 'SUBWAY', lineName: '경의중앙선' }),
+      step({ type: 'WALK', lineName: null }),
+      step({ lineName: '145' }),
+    ])).toBe('버스 145 → 지하철 경의중앙선 → 버스 145')
+    expect(routeLinesText([step({ type: 'WALK', lineName: null })])).toBeNull()
+    expect(routeLinesText([step({ lineName: null })])).toBe('버스')
+  })
+
+  it('연속 도보만 묶고 환승 경계를 넘지 않으며 원본 좌표와 단계 번호를 보존한다', () => {
+    const steps = [step({type:'WALK'}), step({type:'WALK'}), step({}), step({type:'WALK'}), step({type:'SUBWAY'})]
+    const groups = groupTransitSteps(steps)
+    expect(groups.map((group) => group.indices)).toEqual([[0,1],[2],[3],[4]])
+    expect(groups[0].steps[0]).toBe(steps[0])
+    expect(groups[0].steps[1]).toBe(steps[1])
+    expect(steps).toHaveLength(5)
+  })
+
+  it('도보 보강 false라도 출발지 30m 이내면 누락으로 단정하지 않으며 구버전에는 안내하지 않는다', () => {
+    const route = {mode:'TRANSIT' as const, distanceMeters:1000,durationSeconds:300,fare:1500,transfers:0,originWalkIncluded:false,steps:[step({})]}
+    expect(needsOriginWalkCheck(route,{lat:37.5,lng:127})).toBe(false)
+    expect(needsOriginWalkCheck(route,{lat:37.6,lng:127})).toBe(true)
+    expect(needsOriginWalkCheck({...route,originWalkIncluded:true},{lat:37.6,lng:127})).toBe(false)
+    expect(needsOriginWalkCheck({...route,originWalkIncluded:undefined},{lat:37.6,lng:127})).toBe(false)
+    expect(needsOriginWalkCheck({...route,steps:[step({path:[]})]},{lat:37.5,lng:127})).toBe(true)
   })
 })

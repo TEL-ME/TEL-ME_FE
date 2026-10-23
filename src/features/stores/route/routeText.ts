@@ -1,4 +1,5 @@
 import type { RouteMode, RouteStep, RouteStepType, StoreRoute } from '../../../api/stores'
+import { distanceMeters, type LatLng } from '../format'
 
 export const ROUTE_MODES: { mode: RouteMode; label: string }[] = [
   { mode: 'TRANSIT', label: '대중교통' },
@@ -41,6 +42,34 @@ export function fareText(fare: number | null): string | null {
 export function transfersText(transfers: number | null): string | null {
   if (transfers == null) return null
   return transfers === 0 ? '환승 없음' : `환승 ${transfers}회`
+}
+
+/** 도보는 생략하고 실제 탑승 순서대로 노선을 요약한다. 같은 노선 재탑승도 그대로 둔다 */
+export function routeLinesText(steps: RouteStep[]): string | null {
+  const lines = steps
+    .filter((step) => step.type === 'BUS' || step.type === 'SUBWAY')
+    .map((step) => step.lineName ? `${STEP_LABEL[step.type]} ${step.lineName}` : STEP_LABEL[step.type])
+  return lines.length ? lines.join(' → ') : null
+}
+
+/** 연속 도보만 묶고 원본 단계 번호를 보존한다. 지도 좌표와 API 합계는 바꾸지 않는다 */
+export function groupTransitSteps(steps: RouteStep[]): { steps: RouteStep[]; indices: number[] }[] {
+  const groups: { steps: RouteStep[]; indices: number[] }[] = []
+  steps.forEach((step, index) => {
+    const last = groups.at(-1)
+    if (step.type === 'WALK' && last?.steps[0].type === 'WALK') {
+      last.steps.push(step)
+      last.indices.push(index)
+    } else groups.push({ steps: [step], indices: [index] })
+  })
+  return groups
+}
+
+/** false는 보강하지 않았다는 뜻이다. 출발지 바로 옆에서 시작하면 누락으로 단정하지 않는다 */
+export function needsOriginWalkCheck(route: StoreRoute, origin: LatLng): boolean {
+  if (route.mode !== 'TRANSIT' || route.originWalkIncluded !== false || isArrived(route)) return false
+  const first = route.steps[0] && stepPoints(route.steps[0])[0]
+  return !first || distanceMeters(origin, { lat: first.latitude, lng: first.longitude }) > 30
 }
 
 /** 출발지와 매장이 같은 곳이라 갈 필요가 없을 때의 성공 응답 */
