@@ -22,6 +22,7 @@ import PlanSelectPage from '../pages/PlanSelectPage'
 import OnboardingPage from '../pages/OnboardingPage'
 import OAuthCallbackPage from '../pages/OAuthCallbackPage'
 import Placeholder from '../pages/Placeholder'
+import PrivacyPage from '../pages/PrivacyPage'
 import SettingsPage from '../pages/SettingsPage'
 import SignupPage from '../pages/SignupPage'
 import SocialMatchPage from '../pages/SocialMatchPage'
@@ -53,8 +54,7 @@ const routes: RouteObject[] = [
       { path: '/my/plan', element: <MyPlanPage /> },
       { path: '/my/plan/select', element: <PlanSelectPage /> },
       { path: '/settings', element: <SettingsPage /> },
-      { path: '/terms', element: <Placeholder title="이용약관" note="내용 준비 중" /> },
-      { path: '/privacy', element: <Placeholder title="개인정보처리방침" note="내용 준비 중" /> },
+      { path: '/privacy', element: <PrivacyPage /> },
     ],
   },
   // 하단 메뉴 없는 화면

@@ -74,7 +74,7 @@ export function initAnalytics(): boolean {
 
 /**
  * 화면이 바뀔 때마다 부른다. 수집 기준은 canTrack (Clarity와 같음)
- * - 온보딩(이용약관·개인정보처리방침 동의)을 마친 기기에서만 수집한다
+ * - 온보딩(개인정보처리방침 동의)을 마친 기기에서만 수집한다
  * - 관리자(/admin)·온보딩(/onboarding) 화면은 수집하지 않는다. 그동안 gtag.js가 아무것도 보내지 않게 막는다
  */
 export function syncAnalytics(path: string) {

@@ -20,6 +20,10 @@ interface ImportMetaEnv {
   readonly VITE_GA_MEASUREMENT_ID?: string
   /** true면 GA DebugView에 보이도록 debug_mode를 켠다 (로컬 확인용, 배포에서는 비움) */
   readonly VITE_GA_DEBUG?: string
+  /** 고객센터 전화번호 (예: 1544-0000). 비우면 0000 */
+  readonly VITE_SUPPORT_PHONE?: string
+  /** 고객센터 운영시간 안내 비우면 24시간 상담 */
+  readonly VITE_SUPPORT_HOURS?: string
 }
 
 interface ImportMeta {

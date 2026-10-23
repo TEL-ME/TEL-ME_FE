@@ -1,5 +1,5 @@
-import { RotateCw } from 'lucide-react'
-import { useEffect } from 'react'
+import { Headset, RotateCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type { ChatCoordinates } from '../../../api/chat'
 import type { ChatMessage } from '../../../api/types'
 import FeedbackButtons from '../../feedback/FeedbackButtons'
@@ -9,6 +9,7 @@ import { isBusy, type ChatStatus } from '../chatRunStore'
 import AnswerText from './AnswerText'
 import { BotBubble, PendingUserBubble, UserBubble, type BotTone } from './Bubbles'
 import FollowUps from './FollowUps'
+import HandoffDialog from './HandoffDialog'
 import LocationAskChips from './LocationAskChips'
 import SourceList from './SourceList'
 import StoreResults from './StoreResults'
@@ -194,6 +195,7 @@ export default function MessageList({
             {showExtras && m.storeResults && m.storeResults.length > 0 && (
               <StoreResults items={m.storeResults} context={m.storeSearchContext} closed={closed || askLocked} />
             )}
+            {showExtras && m.handoff && <HandoffNote />}
             {hasSources ? (
               <SourceList messageId={m.messageId} trailing={listen} />
             ) : (
@@ -218,5 +220,26 @@ export default function MessageList({
       )}
 
     </div>
+  )
+}
+
+/** FAQ에서 근거를 찾지 못한 답변 아래 고객센터 연결 (백엔드 TELME-222 handoff). 누르면 연락 방법 창을 띄운다 */
+function HandoffNote() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <div className="mt-2.5 flex items-center gap-2 border-t border-line pt-2.5">
+        <span className="min-w-0 flex-1 text-[13px] leading-5 text-ink-sub">상담원 안내 받기</span>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-brand-soft px-3.5 text-[13px] font-bold text-brand-strong"
+        >
+          <Headset size={15} strokeWidth={2} aria-hidden />
+          고객센터 연결
+        </button>
+      </div>
+      <HandoffDialog open={open} onClose={() => setOpen(false)} />
+    </>
   )
 }

@@ -172,7 +172,6 @@ export default function SettingsPage() {
         <Section title="정보">
           {[
             { label: '시작하기 다시 보기', to: '/onboarding' },
-            { label: '이용약관', to: '/terms' },
             { label: '개인정보처리방침', to: '/privacy' },
           ].map((row) => (
             <button

@@ -81,6 +81,8 @@ export interface ChatMessage {
   myFeedback: MyFeedback | null
   /** 매장을 찾은 기준. 매장 검색이 아니거나 예전 메시지면 없다 */
   storeSearchContext?: StoreSearchContext | null
+  /** FAQ에서 근거를 찾지 못한 답변이면 true (TELME-222). 고객센터 문의를 안내한다. 예전 메시지에는 없다 */
+  handoff?: boolean
 }
 
 export interface ChatMessageHistory {
@@ -161,6 +163,8 @@ export interface ChatExecutionState {
     sequenceNo: number
     messageType: MessageType
     status: MessageStatus
+    /** FAQ 근거 없음 답변이면 true (TELME-222). 화면은 다시 읽은 메시지의 handoff로 그린다 */
+    handoff?: boolean
   } | null
 }
 

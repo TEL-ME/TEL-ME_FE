@@ -22,11 +22,10 @@ export const signupSchema = z
     email,
     password,
     passwordConfirm: z.string(),
-    agreeTerms: z.boolean(),
     agreePrivacy: z.boolean(),
   })
   .refine((v) => v.password === v.passwordConfirm, { path: ['passwordConfirm'], message: '비밀번호가 서로 달라요' })
-  .refine((v) => v.agreeTerms && v.agreePrivacy, { path: ['agreeTerms'], message: '필수 약관에 동의해 주세요' })
+  .refine((v) => v.agreePrivacy, { path: ['agreePrivacy'], message: '개인정보 수집·이용에 동의해 주세요' })
 export type SignupForm = z.infer<typeof signupSchema>
 
 /** 이메일 로그인 추가 (카카오 회원) */
