@@ -242,11 +242,11 @@ export const LLM_TASKS: [LlmTaskType, string][] = [
 export const taskLabel = (t: string) => LLM_TASKS.find(([k]) => k === t)?.[1] ?? t
 
 /**
- * 운영 상태 화면에서 숨기는 작업: 문맥 연결·추천 질문.
- * 대부분 고정 문장·규칙으로 처리돼 LLM 호출 기록이 거의 남지 않아 0건으로만 보인다.
- * (되묻기는 백엔드 TELME-172부터 문장 생성 호출이 기록돼 보인다)
+ * 운영 상태 화면(응답 속도·오류 목록)에서 숨기는 작업: 문맥 연결·추천 질문·되묻기.
+ * 문맥 연결·추천 질문은 대부분 고정 문장·규칙으로 처리돼 LLM 호출 기록이 거의 남지 않아 0건으로만 보인다.
+ * 되묻기는 백엔드 TELME-182(#174)부터 LLM 대신 고정 문구로 만들어 호출 기록이 남지 않는다 (항상 0건)
  */
-export const HIDDEN_TASKS = new Set<string>(['CONTEXT_RESOLUTION', 'FOLLOW_UP'])
+export const HIDDEN_TASKS = new Set<string>(['CONTEXT_RESOLUTION', 'FOLLOW_UP', 'CLARIFICATION'])
 export const VISIBLE_TASKS = LLM_TASKS.filter(([k]) => !HIDDEN_TASKS.has(k))
 
 export type LlmErrorType = 'TIMEOUT' | 'CONNECTION_FAILED' | 'MODEL_ERROR'
