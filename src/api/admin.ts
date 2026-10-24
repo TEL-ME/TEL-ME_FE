@@ -136,10 +136,17 @@ export interface UnansweredListItem {
   type: UnansweredType
   /** 이 답변을 요청한 사용자 메시지. 되묻기 뒤에는 조건 답변(예: 마포구)이 들어 있다 */
   questionPreview: string
-  /** 되묻기가 있었으면 상담을 시작한 원래 질문. 없으면 null */
+  /** 상담을 시작한 원래 질문. 되묻기가 없었으면 질문 자신과 같다 (answeredClarification으로 구분) */
   originQuestionPreview: string | null
   createdAt: string
 }
+
+/**
+ * 되묻기에 답한 질문인지. 백엔드는 되묻기가 없어도 질문 자신을 원래 질문으로 내려주므로(의도된 동작)
+ * 원래 질문이 있고 질문과 다를 때만 되묻기에 답한 것으로 본다
+ */
+export const answeredClarification = (origin: string | null | undefined, question: string) =>
+  !!origin && origin.trim() !== question.trim()
 
 /** 화면에 보여 줄 질문: 원래 질문이 있으면 그것, 없으면 요청 메시지 */
 export const mainQuestion = (m: { questionPreview: string; originQuestionPreview: string | null }) =>
@@ -151,7 +158,7 @@ export interface UnansweredDetail {
   type: UnansweredType
   /** 되묻기 뒤에는 조건 답변이 들어 있다 */
   question: string
-  /** 되묻기가 있었으면 상담을 시작한 원래 질문. 없으면 null */
+  /** 상담을 시작한 원래 질문. 되묻기가 없었으면 질문 자신과 같다 (answeredClarification으로 구분) */
   originQuestion: string | null
   answer: string | null
   createdAt: string

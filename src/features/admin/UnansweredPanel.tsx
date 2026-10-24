@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Fragment, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { adminUnansweredApi, mainQuestion, type UnansweredType } from '../../api/admin'
+import { adminUnansweredApi, answeredClarification, mainQuestion, type UnansweredType } from '../../api/admin'
 import { formatAdminTime } from '../../lib/date'
 import { Badge, Card, Chip, Empty, FilterSelect, Pager, TableHead } from './components/AdminUi'
 import { PERIODS, periodFrom, type Period } from './periods'
@@ -95,7 +95,7 @@ export default function UnansweredPanel() {
                 className="flex min-w-0 flex-col text-left hover:underline"
               >
                 <span className="truncate">{mainQuestion(m)}</span>
-                {m.originQuestionPreview && (
+                {answeredClarification(m.originQuestionPreview, m.questionPreview) && (
                   <span className="truncate text-xs text-ink-muted">되묻기에 답함: {m.questionPreview}</span>
                 )}
               </button>
@@ -127,14 +127,16 @@ function UnansweredDetailRow({ id }: { id: number }) {
       </div>
     )
   }
+  // 되묻기가 없던 질문은 원래 질문이 질문 자신과 같게 온다
+  const asked = answeredClarification(d.originQuestion, d.question)
   return (
     <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-6 border-t border-line bg-surface-2 px-5 py-5 text-sm">
       <div className="flex flex-col gap-4">
         <section>
-          <h3 className="mb-1.5 text-xs font-bold text-ink-muted">{d.originQuestion ? '처음 질문' : '질문 전체'}</h3>
+          <h3 className="mb-1.5 text-xs font-bold text-ink-muted">{asked ? '처음 질문' : '질문 전체'}</h3>
           <p className="whitespace-pre-line rounded-xl bg-surface px-4 py-3">{d.originQuestion || d.question}</p>
         </section>
-        {d.originQuestion && (
+        {asked && (
           <section>
             <h3 className="mb-1.5 text-xs font-bold text-ink-muted">되묻기에 답한 내용</h3>
             <p className="whitespace-pre-line rounded-xl bg-surface px-4 py-3">{d.question}</p>

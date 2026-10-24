@@ -1,7 +1,7 @@
 import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RotateCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { adminDashboardApi, adminFeedbackApi, adminUnansweredApi, mainQuestion, type DashboardDay } from '../../api/admin'
+import { adminDashboardApi, adminFeedbackApi, adminUnansweredApi, answeredClarification, mainQuestion, type DashboardDay } from '../../api/admin'
 import { Badge, Card, Empty, PageHeader, secondaryBtn } from '../../features/admin/components/AdminUi'
 import { daysAgoIso, formatAdminTime } from '../../lib/date'
 import { dislikeReasonLabel } from '../../features/feedback/reasons'
@@ -122,7 +122,7 @@ export default function AdminDashboardPage() {
               return (
                 <li key={m.messageId} className="flex items-center gap-3 border-t border-line px-5 py-2.5 text-sm">
                   <Badge tone={tone as 'brand'}>{label}</Badge>
-                  <span className="min-w-0 flex-1 truncate" title={m.originQuestionPreview ? `되묻기에 답함: ${m.questionPreview}` : undefined}>
+                  <span className="min-w-0 flex-1 truncate" title={answeredClarification(m.originQuestionPreview, m.questionPreview) ? `되묻기에 답함: ${m.questionPreview}` : undefined}>
                     {mainQuestion(m)}
                   </span>
                   <Link
