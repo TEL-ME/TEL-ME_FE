@@ -136,10 +136,17 @@ export interface UnansweredListItem {
   type: UnansweredType
   /** 이 답변을 요청한 사용자 메시지. 되묻기 뒤에는 조건 답변(예: 마포구)이 들어 있다 */
   questionPreview: string
-  /** 되묻기가 있었으면 상담을 시작한 원래 질문. 없으면 null */
+  /** 상담을 시작한 원래 질문. 되묻기가 없었으면 질문 자신과 같다 (answeredClarification으로 구분) */
   originQuestionPreview: string | null
   createdAt: string
 }
+
+/**
+ * 되묻기에 답한 질문인지. 백엔드는 되묻기가 없어도 질문 자신을 원래 질문으로 내려주므로(의도된 동작)
+ * 원래 질문이 있고 질문과 다를 때만 되묻기에 답한 것으로 본다
+ */
+export const answeredClarification = (origin: string | null | undefined, question: string) =>
+  !!origin && origin.trim() !== question.trim()
 
 /** 화면에 보여 줄 질문: 원래 질문이 있으면 그것, 없으면 요청 메시지 */
 export const mainQuestion = (m: { questionPreview: string; originQuestionPreview: string | null }) =>
@@ -151,7 +158,7 @@ export interface UnansweredDetail {
   type: UnansweredType
   /** 되묻기 뒤에는 조건 답변이 들어 있다 */
   question: string
-  /** 되묻기가 있었으면 상담을 시작한 원래 질문. 없으면 null */
+  /** 상담을 시작한 원래 질문. 되묻기가 없었으면 질문 자신과 같다 (answeredClarification으로 구분) */
   originQuestion: string | null
   answer: string | null
   createdAt: string
@@ -242,11 +249,11 @@ export const LLM_TASKS: [LlmTaskType, string][] = [
 export const taskLabel = (t: string) => LLM_TASKS.find(([k]) => k === t)?.[1] ?? t
 
 /**
- * 운영 상태 화면에서 숨기는 작업: 문맥 연결·추천 질문.
- * 대부분 고정 문장·규칙으로 처리돼 LLM 호출 기록이 거의 남지 않아 0건으로만 보인다.
- * (되묻기는 백엔드 TELME-172부터 문장 생성 호출이 기록돼 보인다)
+ * 운영 상태 화면(응답 속도·오류 목록)에서 숨기는 작업: 문맥 연결·추천 질문·되묻기.
+ * 문맥 연결·추천 질문은 대부분 고정 문장·규칙으로 처리돼 LLM 호출 기록이 거의 남지 않아 0건으로만 보인다.
+ * 되묻기는 백엔드 TELME-182(#174)부터 LLM 대신 고정 문구로 만들어 호출 기록이 남지 않는다 (항상 0건)
  */
-export const HIDDEN_TASKS = new Set<string>(['CONTEXT_RESOLUTION', 'FOLLOW_UP'])
+export const HIDDEN_TASKS = new Set<string>(['CONTEXT_RESOLUTION', 'FOLLOW_UP', 'CLARIFICATION'])
 export const VISIBLE_TASKS = LLM_TASKS.filter(([k]) => !HIDDEN_TASKS.has(k))
 
 export type LlmErrorType = 'TIMEOUT' | 'CONNECTION_FAILED' | 'MODEL_ERROR'
