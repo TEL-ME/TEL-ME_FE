@@ -297,9 +297,8 @@ export default function StoreRoutePage() {
             <span className="w-8 shrink-0 font-bold text-ink-sub">도착</span>
             <span className="min-w-0 flex-1 truncate font-semibold">{store.name}</span>
           </div>
+          {/* 출발지 검색창은 이동 수단과 상관없이 항상 펼쳐 둔다 (대중교통만 접혀 있던 것을 통일) */}
           {hasKakaoKey && (
-            <details open={mode === 'TRANSIT' && origin ? undefined : true}>
-            <summary className={mode === 'TRANSIT' && origin ? 'cursor-pointer py-1 text-xs font-semibold text-ink-sub' : 'hidden'}>출발지 변경</summary>
             <form onSubmit={(e) => void search(e)} className="mt-1 flex gap-2">
               <input
                 value={query}
@@ -316,7 +315,6 @@ export default function StoreRoutePage() {
                 검색
               </button>
             </form>
-            </details>
           )}
           {originError && (
             <p role="alert" className="text-[13px] leading-5 text-danger">

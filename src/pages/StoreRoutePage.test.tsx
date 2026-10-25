@@ -222,13 +222,20 @@ describe('StoreRoutePage', () => {
     expect(routeCalls).toHaveLength(1)
   })
 
+  it('대중교통도 다른 수단처럼 출발지 검색창이 펼쳐져 있다', async () => {
+    routeReply = () => json(200, ok(MULTI_TRANSIT))
+    renderPage()
+    await screen.findByRole('radio', { name: '추천 경로' })
+    expect(screen.getByRole('textbox', { name: '출발지 검색' })).toBeVisible()
+    expect(screen.queryByText('출발지 변경')).not.toBeInTheDocument()
+  })
+
   it('출발지를 바꾸면 새 응답의 첫 경로로 초기화한다', async () => {
     routeReply = () => json(200, ok(MULTI_TRANSIT))
     vi.mocked(searchPoint).mockResolvedValue({ label: '강남역', center: { lat: 37.4979, lng: 127.0276 } })
     renderPage()
     await userEvent.click(await screen.findByRole('radio', { name: '다른 경로 1' }))
     const previousFitKey = lastMapProps().fitKey
-    await userEvent.click(screen.getByText('출발지 변경'))
     await userEvent.type(screen.getByRole('textbox', { name: '출발지 검색' }), '강남역')
     await userEvent.click(screen.getByRole('button', { name: '검색' }))
     await waitFor(() => expect(screen.getByRole('radio', { name: '추천 경로' })).toBeChecked())
