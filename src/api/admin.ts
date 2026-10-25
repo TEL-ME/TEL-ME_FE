@@ -297,10 +297,37 @@ export interface SearchScoreBucket {
 }
 
 /**
+ * 근거 판정 뒤 실제 결과 (백엔드 TELME-233). 판정 결과가 남은 질문만 센다.
+ * - 선(qaPass·qaFloor·questionPass·questionFloor)은 현재 설정값. 지난 기록은 당시 선으로 판정된 결과다
+ * - recorded = 아래 여섯 건수의 합(서로 겹치지 않음). 배포 전 기록·회색 구간을 끈 동안의 검색은 빠진다
+ * - passedDirectly: 근거에 판정 없이 통과한 FAQ가 있음 / passedByJudge: 판정기가 답할 수 있다고 본 FAQ로 찾음
+ * - passedOnJudgeFailure: 판정이 실패해 점수로 남긴 후보만 근거 / rejectedByJudge: 판정기가 모두 거절
+ * - droppedOnJudgeFailure: 판정 실패로 버린 후보가 있고 근거 없음 / belowFloor: 후보가 모두 아래 선 미만
+ * - refinedFinalPassed: 첫 검색은 비었지만 정제 질문으로 찾은 질문(판정 뒤 기준)
+ */
+export interface SearchScoreGrayZone {
+  enabled: boolean
+  qaPass: number
+  qaFloor: number
+  questionPass: number
+  questionFloor: number
+  recorded: number
+  passedDirectly: number
+  passedByJudge: number
+  passedOnJudgeFailure: number
+  rejectedByJudge: number
+  droppedOnJudgeFailure: number
+  belowFloor: number
+  refinedFinalPassed: number
+}
+
+/**
  * 검색 점수 분포 (TELME-123). 상담에서 질문마다 처음 한 FAQ 검색 기준.
  * - total: 질문 수 / scored: 질문+답변 벡터(Q_A) 1위 점수가 있는 질문 수(= buckets 합)
  * - passed: 첫 검색으로 근거를 찾은 질문 / refinedPassed: 첫 검색은 비었지만 정제 질문으로 찾은 질문
  * - aboveThreshold: 1위 점수가 검색 당시 임계값 이상인 질문 / buckets: 0~1을 0.05 간격 20칸
+ * - threshold·passed·refinedPassed·aboveThreshold는 근거 판정 전 기준(비교용). 실제 결과는 grayZone
+ * - grayZone: 백엔드 배포 전이면 없다
  */
 export interface SearchScores {
   threshold: number
@@ -310,6 +337,7 @@ export interface SearchScores {
   refinedPassed: number
   aboveThreshold: number
   buckets: SearchScoreBucket[]
+  grayZone?: SearchScoreGrayZone
 }
 
 export const adminSystemApi = {

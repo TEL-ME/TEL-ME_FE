@@ -1,3 +1,5 @@
+import type { SearchScoreGrayZone } from '../../../api/admin'
+
 /** 밀리초를 읽기 쉽게: 850ms · 1.2초 · 1분 5초 */
 export function formatMs(ms: number | null | undefined): string {
   if (ms == null) return '–'
@@ -39,3 +41,30 @@ export function splitLlmError(message: string | null | undefined): LlmErrorParts
 
 /** 실패 원인 중 눈여겨볼 것: 종료 사유(max_tokens 등)·HTTP 상태 */
 export const isKeyDetail = (d: string) => /^(stopReason|status)=/.test(d)
+
+/**
+ * 판정 뒤 결과 여섯 칸을 첫 검색 근거 찾음·못 찾음·판정 실패로 묶는다. found + notFound = recorded.
+ * finalNotFound는 첫 검색에서 못 찾은 질문 중 정제 질문으로도 못 찾은 수다
+ */
+export function judgeOutcomeTotals(g: SearchScoreGrayZone) {
+  const notFound = g.rejectedByJudge + g.droppedOnJudgeFailure + g.belowFloor
+  return {
+    found: g.passedDirectly + g.passedByJudge + g.passedOnJudgeFailure,
+    notFound,
+    finalNotFound: Math.max(0, notFound - g.refinedFinalPassed),
+    judgeFailed: g.passedOnJudgeFailure + g.droppedOnJudgeFailure,
+  }
+}
+
+export type ScoreZone = 'drop' | 'judge' | 'pass'
+
+/**
+ * 점수 분포 칸(min 이상 max 미만)이 속한 답변 규칙 구간. 칸별 개수만 있어 경계가 칸 안에 걸리면
+ * 칸의 가운데 점수로 정한다(칸의 대부분이 속한 구간). qaPass 이상 바로 통과, qaFloor 이상 판정, 그 아래 버림
+ */
+export function scoreZone(min: number, max: number, qaFloor: number, qaPass: number): ScoreZone {
+  const mid = (min + max) / 2
+  if (mid >= qaPass) return 'pass'
+  if (mid >= qaFloor) return 'judge'
+  return 'drop'
+}
