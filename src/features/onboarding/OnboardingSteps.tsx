@@ -70,7 +70,7 @@ export function StepHello() {
 }
 
 const FEATURES = [
-  { icon: MessageSquareText, title: '요금제·유심·해외 로밍', desc: '헷갈리는 통신 용어도 쉬운 말로 풀어 드려요' },
+  { icon: MessageSquareText, title: '요금제·유심·해외 로밍', desc: '요금제 비교부터 로밍 이용 방법까지 바로 알려드려요' },
   { icon: FileText, title: '번호이동·명의변경', desc: '필요한 서류와 순서를 차근차근 알려드려요' },
   { icon: MapPin, title: '가까운 매장 찾기', desc: '원하는 업무가 되는 매장을 지도로 보여드려요' },
 ]
