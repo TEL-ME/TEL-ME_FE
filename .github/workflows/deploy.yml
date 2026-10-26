@@ -34,7 +34,10 @@ env:
 
 jobs:
   deploy:
-    if: vars.DEPLOY_ENABLED == 'true'
+    # 수동 실행도 main을 골랐을 때만 배포한다. 다른 브랜치를 고르면 그 빌드가 운영 S3에 올라간다
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
