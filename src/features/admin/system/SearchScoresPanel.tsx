@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { ChevronDown, Info } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { adminSystemApi, type SearchScoreGrayZone, type SearchScores } from '../../../api/admin'
 import { Badge, Card, Empty, FilterSelect } from '../components/AdminUi'
@@ -168,33 +169,50 @@ function JudgeOutcome({ g, total }: { g: SearchScoreGrayZone; total: number }) {
         />
       </div>
 
-      <ul className="flex flex-col gap-2">
-        {rows.map((r) => (
-          <li key={r.label} className="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)_5.5rem] items-center gap-3 text-[13px]">
-            <div className="min-w-0">
-              <p className="font-bold text-ink">{r.label}</p>
-              <p className="truncate text-xs text-ink-muted" title={r.note}>
-                {r.note}
+      <Fold title="판정 결과 자세히 보기" count={rows.length}>
+        <ul className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <li key={r.label} className="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)_5.5rem] items-center gap-3 text-[13px]">
+              <div className="min-w-0">
+                <p className="font-bold text-ink">{r.label}</p>
+                <p className="truncate text-xs text-ink-muted" title={r.note}>
+                  {r.note}
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-surface-2">
+                <span
+                  className={`block h-full rounded-full ${
+                    r.tone === 'pass' ? 'bg-brand' : r.tone === 'fail' ? 'bg-danger' : 'bg-ink-muted opacity-40'
+                  }`}
+                  style={{
+                    width: `${(r.count / max) * 100}%`,
+                    minWidth: r.count ? 4 : 0,
+                  }}
+                />
+              </div>
+              <p className="text-right tabular-nums text-ink-sub">
+                <span className="font-bold text-ink">{r.count.toLocaleString()}</span> · {rate(r.count, g.recorded)}
               </p>
-            </div>
-            <div className="h-2 rounded-full bg-surface-2">
-              <span
-                className={`block h-full rounded-full ${
-                  r.tone === 'pass' ? 'bg-brand' : r.tone === 'fail' ? 'bg-danger' : 'bg-ink-muted opacity-40'
-                }`}
-                style={{
-                  width: `${(r.count / max) * 100}%`,
-                  minWidth: r.count ? 4 : 0,
-                }}
-              />
-            </div>
-            <p className="text-right tabular-nums text-ink-sub">
-              <span className="font-bold text-ink">{r.count.toLocaleString()}</span> · {rate(r.count, g.recorded)}
-            </p>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      </Fold>
     </Card>
+  )
+}
+
+/** 접어 둔 상세 목록. AI 처리 흐름 화면(ExecutionPanel)의 접기와 같은 모양이다 */
+function Fold({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="border-t border-line pt-3">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-1.5 text-left text-[13px] font-bold">
+        {title}
+        {count != null && <span className="font-semibold text-ink-muted">{count}</span>}
+        <ChevronDown size={16} aria-hidden className={`ml-auto text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="mt-2.5">{children}</div>}
+    </section>
   )
 }
 
@@ -216,6 +234,8 @@ const ZONE: Record<ScoreZone, { bg: string; text: string }> = {
   pass: { bg: 'var(--brand)', text: 'text-white' },
 }
 
+const ZONE_LABEL: Record<ScoreZone, string> = { drop: '버림', judge: '판정', pass: '바로 통과' }
+
 /**
  * 0~1을 0.05 간격 20칸. 막대 높이는 그 점수대의 질문 수다.
  * 판정 구간이 있으면 설명도 판정 기준 규칙으로 쓰고, 막대마다 지금 답변 규칙(버림·판정·바로 통과) 중 한 색을 칠하고,
@@ -227,31 +247,33 @@ function Histogram({ d }: { d: SearchScores }) {
   const g = d.grayZone
   const max = Math.max(1, ...d.buckets.map((b) => b.count))
   const line = Math.min(100, Math.max(0, d.threshold * 100))
+  const questionNote = g
+    ? `질문만 비교한 점수(${score(g.questionPass)} 이상 통과, ${score(g.questionFloor)}~${score(g.questionPass)} 판정)도 같이 쓰지만 그래프에는 없어요`
+    : ''
 
   return (
     <Card className="flex flex-col gap-4 px-5 py-4">
       <div>
-        <h2 className="text-[17px] font-extrabold">{g ? '검색 점수 분포' : 'Q_A 1위 점수 분포'}</h2>
-        <p className="text-[13px] text-ink-muted">
-          질문마다 가장 비슷한 FAQ의 점수({g ? '질문+답변 기준' : '질문+답변 벡터'}, 0~1)를 0.05 간격으로 나눠 센 질문 수예요
-        </p>
         {g ? (
-          // 판정 기준 규칙. 값은 현재 설정에서 가져온다. 판정 전 임계값은 수치 줄에만 쓴다
+          // 규칙(0.69·0.80)은 아래 띠와 수치 줄이 보여 줘 설명은 한 줄만 쓰고, 그래프에 없는 질문 벡터 기준은 제목 옆 ⓘ에 둔다
           <>
-            <p className="text-[13px] text-ink-muted">
-              {score(g.qaPass)} 이상은 바로 근거로 쓰고, {score(g.qaFloor)}~{score(g.qaPass)}은 판정기가 근거인지 확인하고, {score(g.qaFloor)}{' '}
-              미만은 버려요. 막대 색은 그 칸이 대부분 속한 구간이에요
-            </p>
-            <p className="text-[13px] text-ink-muted">
-              질문만 비교한 점수({score(g.questionPass)} 이상 통과, {score(g.questionFloor)}~{score(g.questionPass)} 판정)도 같이 쓰지만
-              그래프에는 없어요
-            </p>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-[17px] font-extrabold">검색 점수 분포</h2>
+              <span className="text-ink-muted" title={questionNote} aria-label={questionNote} role="img">
+                <Info size={15} aria-hidden />
+              </span>
+            </div>
+            <p className="text-[13px] text-ink-muted">질문마다 가장 비슷한 FAQ의 점수(질문+답변 기준) 분포예요 · 막대 색은 아래 띠의 답변 규칙이에요</p>
           </>
         ) : (
-          <p className="text-[13px] text-ink-muted">
-            {d.scored.toLocaleString()}건 중 임계값 {score(d.threshold)} 이상 {d.aboveThreshold.toLocaleString()}건(
-            {rate(d.aboveThreshold, d.scored)}) · 이 점수가 낮아도 질문 벡터로 통과했을 수 있어요
-          </p>
+          <>
+            <h2 className="text-[17px] font-extrabold">Q_A 1위 점수 분포</h2>
+            <p className="text-[13px] text-ink-muted">질문마다 가장 비슷한 FAQ의 점수(질문+답변 벡터, 0~1)를 0.05 간격으로 나눠 센 질문 수예요</p>
+            <p className="text-[13px] text-ink-muted">
+              {d.scored.toLocaleString()}건 중 임계값 {score(d.threshold)} 이상 {d.aboveThreshold.toLocaleString()}건(
+              {rate(d.aboveThreshold, d.scored)}) · 이 점수가 낮아도 질문 벡터로 통과했을 수 있어요
+            </p>
+          </>
         )}
       </div>
       <div className="flex flex-col">
@@ -261,7 +283,9 @@ function Histogram({ d }: { d: SearchScores }) {
               <div
                 key={b.min}
                 className="group relative flex h-full flex-1 flex-col justify-end"
-                title={`${score(b.min)} ~ ${score(b.max)}: ${b.count.toLocaleString()}건`}
+                title={`${score(b.min)} ~ ${score(b.max)}: ${b.count.toLocaleString()}건${
+                  g ? ` · ${ZONE_LABEL[scoreZone(b.min, b.max, g.qaFloor, g.qaPass)]}(칸의 대부분이 속한 구간)` : ''
+                }`}
               >
                 {b.count > 0 && (
                   <span className="mb-1 text-center text-[10px] font-semibold text-ink-sub opacity-0 group-hover:opacity-100">
@@ -312,20 +336,20 @@ function Histogram({ d }: { d: SearchScores }) {
 /** 지금 답변 규칙(Q_A 기준)을 막대와 같은 0~1 폭에 정확한 경계로 그린 띠 */
 function RuleStrip({ g }: { g: SearchScoreGrayZone }) {
   const pct = (v: number) => Math.min(100, Math.max(0, v * 100))
-  const segments: { label: string; width: number; zone: ScoreZone }[] = [
-    { label: '버림', width: pct(g.qaFloor), zone: 'drop' },
-    { label: '판정', width: pct(g.qaPass) - pct(g.qaFloor), zone: 'judge' },
-    { label: '바로 통과', width: 100 - pct(g.qaPass), zone: 'pass' },
+  const segments: { width: number; zone: ScoreZone }[] = [
+    { width: pct(g.qaFloor), zone: 'drop' },
+    { width: pct(g.qaPass) - pct(g.qaFloor), zone: 'judge' },
+    { width: 100 - pct(g.qaPass), zone: 'pass' },
   ]
   return (
     <div className="mt-1.5 flex h-[22px] overflow-hidden rounded-md text-[11px] font-bold">
       {segments.map((s) => (
         <div
-          key={s.label}
+          key={s.zone}
           className={`flex items-center justify-center whitespace-nowrap ${ZONE[s.zone].text}`}
           style={{ width: `${s.width}%`, background: ZONE[s.zone].bg }}
         >
-          {s.label}
+          {ZONE_LABEL[s.zone]}
         </div>
       ))}
     </div>
