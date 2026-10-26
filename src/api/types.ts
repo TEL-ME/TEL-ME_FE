@@ -1,0 +1,239 @@
+/** 백엔드 공통 응답 (global/common/CustomResponse) */
+export interface CustomResponse<T> {
+  isSuccess: boolean
+  code: string
+  message: string
+  result: T
+}
+
+// ---- 채팅 (TEL-ME_BE develop 기준) ----
+export type SessionStatus = 'ACTIVE' | 'NEED_CLARIFICATION' | 'CLOSED'
+export type MessageRole = 'USER' | 'ASSISTANT'
+/** BLOCKED: 입력 검사(욕설·민감정보)에 걸려 답변을 만들지 않은 사용자 메시지 */
+export type MessageType = 'QUESTION' | 'ANSWER' | 'CLARIFICATION' | 'STORE_RESULT' | 'ERROR' | 'BLOCKED'
+export type MessageStatus = 'GENERATING' | 'COMPLETED' | 'FAILED' | 'TIMEOUT' | 'CANCELLED'
+export type AnswerBasis = 'GROUNDED' | 'NO_EVIDENCE' | 'OUT_OF_SCOPE'
+export type ExecutionStatus = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+
+export interface ChatSession {
+  sessionId: number
+  title: string | null
+  status: SessionStatus
+  createdAt: string
+  lastActiveAt: string
+}
+
+export interface ChatSessionList {
+  sessions: ChatSession[]
+  nextCursor: string | null
+  hasNext: boolean
+}
+
+export type Rating = 'LIKE' | 'DISLIKE'
+/** OTHER(기타)는 의견(comment)이 필수 */
+export type DislikeReason = 'WRONG_INFO' | 'NOT_RELATED' | 'HARD_TO_READ' | 'OTHER'
+
+export interface MyFeedback {
+  rating: Rating
+  reason: DislikeReason | null
+  comment: string | null
+}
+
+/**
+ * 매장 안내 답변에 담기는 매장 한 곳 (백엔드 ChatStoreResponse, TELME-103).
+ * 예전에 저장된 메시지는 일부 값이 없을 수 있어서 화면에서는 있는 값만 골라 쓴다.
+ */
+export interface ChatStoreSnapshot {
+  storeId: number
+  name: string
+  address: string
+  phone: string | null
+  /** 매장 좌표 (검색한 곳의 좌표가 아니다) */
+  latitude: number
+  longitude: number
+  /** 검색 기준점에서의 직선거리. 지역 전체 검색이면 null */
+  distanceMeters: number | null
+}
+
+/** 매장을 어떤 기준으로 찾았는지 (백엔드 ChatStoreSearchContextResponse) */
+export interface StoreSearchContext {
+  type: 'CURRENT_LOCATION' | 'REGION' | 'ADDRESS' | 'PLACE'
+  /** 검색 기준 이름. 현재 위치로 찾았으면 "현재 위치" */
+  label: string
+  /** 실제로 찾은 반경. 지역 전체 검색이면 null */
+  radiusMeters: number | null
+}
+
+export interface ChatMessage {
+  messageId: number
+  sequenceNo: number
+  replyToMessageId: number | null
+  role: MessageRole
+  messageType: MessageType
+  content: string | null
+  status: MessageStatus
+  answerBasis: AnswerBasis | null
+  followUps: string[] | null
+  storeResults: Record<string, unknown>[] | null
+  createdAt: string
+  completedAt: string | null
+  ratable: boolean
+  myFeedback: MyFeedback | null
+  /** 매장을 찾은 기준. 매장 검색이 아니거나 예전 메시지면 없다 */
+  storeSearchContext?: StoreSearchContext | null
+  /** FAQ에서 근거를 찾지 못한 답변이면 true (TELME-222). 고객센터 문의를 안내한다. 예전 메시지에는 없다 */
+  handoff?: boolean
+}
+
+export interface ChatMessageHistory {
+  messages: ChatMessage[]
+  nextBeforeSequenceNo: number | null
+  hasOlderMessages: boolean
+  /** 답변 생성 중이면 그 실행 ID. 새로고침 후 이 값으로 SSE를 다시 구독한다 */
+  runningExecutionId: number | null
+  /**
+   * 마지막 답변이 일시적인 생성 실패(LLM502-4)이고 아직 다시 시도하지 않았으면 그 실행 ID (TELME-219).
+   * 이 값이 있을 때만 "다시 시도" 버튼을 그리고, 재시도 API에 그대로 넘긴다
+   */
+  retryableExecutionId?: number | null
+}
+
+/**
+ * 입력 검사 결과 (TELME-119)
+ * - MASKED: 민감정보를 가리고 정상 접수 (실행 ID 있음)
+ * - WARNED: 욕설 경고 · REWRITE_REQUIRED: 민감정보 빼고 다시 입력 · RESTRICTED: 일시 제한 (셋 다 실행 ID 없음)
+ */
+export type InputGuardAction = 'MASKED' | 'WARNED' | 'REWRITE_REQUIRED' | 'RESTRICTED'
+
+export interface InputGuardNotice {
+  action: InputGuardAction
+  message: string
+  violationCount: number
+  retryAfterSeconds: number
+  restrictionStartedAt: string | null
+  restrictionUntil: string | null
+  detections: { reason: string; ruleId: string }[]
+}
+
+export interface ChatMessageSendResponse {
+  sessionId: number
+  /** 이미 제한 중이면 메시지를 저장하지 않아 없다 */
+  messageId?: number | null
+  sequenceNo?: number | null
+  /** 없으면 답변을 만들지 않은 것 (경고·재입력 안내·일시 제한). SSE를 구독하지 않는다 */
+  executionId?: number | null
+  executionStatus?: ExecutionStatus | null
+  createdAt: string
+  inputGuard?: InputGuardNotice | null
+  /** 게스트가 이 질문을 접수한 뒤 오늘 남은 질문 수 (TELME-213). 회원·제한 꺼짐·입력 검사로 막힌 응답에는 없다 */
+  guestQuestionsRemaining?: number | null
+}
+
+/** 게스트 하루 질문 수 상태 (GET /chat/guest-limit, TELME-213). 회원·제한 꺼짐이면 limited=false, 나머지 null */
+export interface GuestLimitStatus {
+  limited: boolean
+  dailyLimit: number | null
+  remaining: number | null
+  /** 다시 차는 시각 (다음 한국 시간 0시, ISO) */
+  resetsAt: string | null
+}
+
+export interface ChatSource {
+  faqId: number
+  title: string
+  searchRank: number
+  score: number
+}
+
+export interface ChatSources {
+  messageId: number
+  sources: ChatSource[]
+}
+
+/** SSE complete 이벤트 데이터. 답변 본문은 없으므로 받은 뒤 메시지 목록을 다시 불러온다 */
+export interface ChatExecutionState {
+  sessionId: number
+  executionId: number
+  status: ExecutionStatus
+  errorCode: string | null
+  outputMessage: {
+    sessionId: number
+    executionId: number
+    messageId: number
+    sequenceNo: number
+    messageType: MessageType
+    status: MessageStatus
+    /** FAQ 근거 없음 답변이면 true (TELME-222). 화면은 다시 읽은 메시지의 handoff로 그린다 */
+    handoff?: boolean
+  } | null
+}
+
+/** SSE error 이벤트 데이터 */
+export interface ChatFailure {
+  status: 'FAILED' | 'TIMEOUT' | 'CANCELLED'
+  errorCode: string
+  message: string
+  /** 재시도 API로 다시 만들 수 있는 실패 (LLM502-4). 질문당 한 번만 */
+  retryable?: boolean
+}
+
+// ---- 피드백 ----
+export interface FeedbackSaveRequest {
+  rating: Rating
+  reason?: DislikeReason
+  comment?: string
+}
+
+export interface FeedbackResponse {
+  id: number
+  messageId: number
+  rating: Rating
+  reason: DislikeReason | null
+  comment: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// ---- 인증 ----
+export interface LoginResponse {
+  userId: number
+  email: string
+}
+
+/** 소셜 로그인 제공자 (sessionStorage에도 이 코드로 적는다) */
+export type SocialProviderCode = 'KAKAO' | 'GOOGLE'
+export type LoginMethod = 'EMAIL' | SocialProviderCode
+
+/** GET /api/v1/auth/me — 로그인 안 했으면 200 + role GUEST */
+export interface Me {
+  authenticated: boolean
+  userId: number | null
+  email: string | null
+  /** 이메일 가입 때 받은 이름, 소셜은 닉네임 */
+  name: string | null
+  role: 'GUEST' | 'USER' | 'ADMIN'
+  loginMethods: LoginMethod[]
+}
+
+// ---- 알림 (TELME-192) ----
+/** ANSWER_ARRIVED: 답변·되묻기·매장 결과 도착 · ANSWER_FAILED: 답변 실패·시간 초과 */
+export type NotificationType = 'ANSWER_ARRIVED' | 'ANSWER_FAILED'
+
+export interface AppNotification {
+  notificationId: number
+  type: NotificationType
+  /** 채팅방 제목. 제목이 만들어지기 전이면 null */
+  title: string | null
+  /** 답변 앞부분(최대 50자). 실패 알림은 비어 있을 수 있다 */
+  body: string | null
+  sessionId: number
+  messageId: number
+  createdAt: string
+  read: boolean
+}
+
+export interface NotificationList {
+  notifications: AppNotification[]
+  nextCursor: number | null
+  hasNext: boolean
+}

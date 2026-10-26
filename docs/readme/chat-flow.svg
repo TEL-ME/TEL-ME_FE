@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="590" viewBox="0 0 1200 590" role="img" aria-labelledby="t d">
+  <title id="t">채팅 답변을 화면에 띄우는 흐름</title>
+  <desc id="d">질문을 보내면 실행 번호를 받고, SSE로 실행을 구독하다가 완료되면 메시지를 다시 읽어 타자 효과로 보여 준다. 연결이 끊기면 다시 구독하고, 다른 화면으로 옮겨도 백그라운드로 받아 알린다.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10z" fill="#9A929D"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif; fill: #2B262D; }
+    .title { font-size: 24px; font-weight: 800; }
+    .sub { font-size: 15px; fill: #6B6470; }
+    .state { font-size: 12.5px; font-weight: 800; fill: #9A929D; }
+    .state-p { font-size: 12.5px; font-weight: 800; fill: #C34074; }
+    .name { font-size: 18px; font-weight: 800; }
+    .desc { font-size: 13.5px; fill: #4A444F; }
+    .chip { font-size: 12px; font-weight: 700; fill: #6B6470; }
+    .chip-pink { font-size: 12px; font-weight: 700; fill: #C34074; }
+    .sec { font-size: 14px; font-weight: 800; fill: #6B6470; }
+    .h { font-size: 15px; font-weight: 800; }
+    .d { font-size: 13px; fill: #4A444F; }
+    .foot { font-size: 13px; fill: #6B6470; }
+  </style>
+
+  <rect x="1" y="1" width="1198" height="588" rx="22" fill="#FFFFFF" stroke="#E6E1E7" stroke-width="2"/>
+  <text x="40" y="54" class="title">질문 하나가 화면의 답이 되기까지</text>
+  <text x="40" y="82" class="sub">답변은 서버에서 만들어지고, 화면은 실행을 구독하다가 결과가 오면 메시지를 다시 읽어 보여 준다</text>
+
+  <!-- 상태 카드: x = 40 + i*290, 폭 250 -->
+  <g>
+    <rect x="40" y="110" width="250" height="150" rx="16" fill="#F6F4F7" stroke="#E6E1E7"/>
+    <text x="60" y="138" class="state">sending</text>
+    <text x="60" y="168" class="name">질문 보내기</text>
+    <text x="60" y="194" class="desc">질문을 저장하고</text>
+    <text x="60" y="214" class="desc">실행 번호를 받는다</text>
+    <rect x="60" y="226" width="118" height="24" rx="12" fill="#FFFFFF" stroke="#DAD4DC"/><text x="119" y="242.5" class="chip" text-anchor="middle">POST /messages</text>
+  </g>
+  <g>
+    <rect x="330" y="110" width="250" height="150" rx="16" fill="#FBEAF1" stroke="#C34074" stroke-width="2"/>
+    <text x="350" y="138" class="state-p">thinking</text>
+    <text x="350" y="168" class="name">답변 기다리기</text>
+    <text x="350" y="194" class="desc">EventSource로</text>
+    <text x="350" y="214" class="desc">그 실행을 구독한다</text>
+    <rect x="350" y="226" width="104" height="24" rx="12" fill="#FFFFFF" stroke="#E7B6C9"/><text x="402" y="242.5" class="chip-pink" text-anchor="middle">SSE subscribe</text>
+  </g>
+  <g>
+    <rect x="620" y="110" width="250" height="150" rx="16" fill="#F6F4F7" stroke="#E6E1E7"/>
+    <text x="640" y="138" class="state">streaming</text>
+    <text x="640" y="168" class="name">답변 보여 주기</text>
+    <text x="640" y="194" class="desc">메시지를 다시 읽고</text>
+    <text x="640" y="214" class="desc">몇 글자씩 늘려 표시</text>
+    <rect x="640" y="226" width="112" height="24" rx="12" fill="#FFFFFF" stroke="#DAD4DC"/><text x="696" y="242.5" class="chip" text-anchor="middle">2초 안팎에 끝</text>
+  </g>
+  <g>
+    <rect x="910" y="110" width="250" height="150" rx="16" fill="#F6F4F7" stroke="#E6E1E7"/>
+    <text x="930" y="138" class="state">completed</text>
+    <text x="930" y="168" class="name">완료</text>
+    <text x="930" y="194" class="desc">참고 FAQ · 추천 질문</text>
+    <text x="930" y="214" class="desc">피드백 · 답변 듣기</text>
+    <rect x="930" y="226" width="96" height="24" rx="12" fill="#FFFFFF" stroke="#DAD4DC"/><text x="978" y="242.5" class="chip" text-anchor="middle">다음 질문으로</text>
+  </g>
+  <g stroke="#9A929D" stroke-width="2" fill="none">
+    <path d="M292 185 H324" marker-end="url(#a)"/>
+    <path d="M582 185 H614" marker-end="url(#a)"/>
+    <path d="M872 185 H904" marker-end="url(#a)"/>
+  </g>
+
+  <!-- SSE 이벤트 -->
+  <line x1="40" y1="282" x2="1160" y2="282" stroke="#EEEAF0" stroke-width="2"/>
+  <text x="40" y="308" class="sec">답변을 기다리는 동안 받는 SSE 이벤트</text>
+  <g>
+    <rect x="40" y="322" width="265" height="88" rx="14" fill="#F6F4F7"/>
+    <text x="60" y="350" class="h">status · RETRYING</text>
+    <text x="60" y="374" class="d">‘다시 시도 중’을 표시하고</text>
+    <text x="60" y="394" class="d">연결은 그대로 둔다</text>
+  </g>
+  <g>
+    <rect x="325" y="322" width="265" height="88" rx="14" fill="#F6F4F7"/>
+    <text x="345" y="350" class="h">complete</text>
+    <text x="345" y="374" class="d">연결을 닫고</text>
+    <text x="345" y="394" class="d">답변 보여 주기로 넘어간다</text>
+  </g>
+  <g>
+    <rect x="610" y="322" width="265" height="88" rx="14" fill="#F6F4F7"/>
+    <text x="630" y="350" class="h">error · 서버가 보낸 실패</text>
+    <text x="630" y="374" class="d">연결을 닫고 실패 안내와</text>
+    <text x="630" y="394" class="d">‘다시 시도’ 버튼을 보여 준다</text>
+  </g>
+  <g>
+    <rect x="895" y="322" width="265" height="88" rx="14" fill="#FBEAF1" stroke="#C34074"/>
+    <text x="915" y="350" class="h" style="fill:#A3315F">연결만 끊김</text>
+    <text x="915" y="374" class="d">아직 만드는 중이면</text>
+    <text x="915" y="394" class="d">1·2·3초 뒤 다시 구독 (최대 3회)</text>
+  </g>
+
+  <!-- 백그라운드 -->
+  <line x1="40" y1="432" x2="1160" y2="432" stroke="#EEEAF0" stroke-width="2"/>
+  <text x="40" y="458" class="sec">다른 화면으로 옮겨도 구독은 백그라운드로 이어지고, 끝나면 알린다</text>
+  <g>
+    <rect x="40" y="472" width="360" height="70" rx="14" fill="#FFFFFF" stroke="#DAD4DC"/>
+    <text x="60" y="500" class="h">그 대화를 보고 있으면</text>
+    <text x="60" y="524" class="d">알리지 않고 바로 보여 준다</text>
+  </g>
+  <g>
+    <rect x="420" y="472" width="360" height="70" rx="14" fill="#FFFFFF" stroke="#DAD4DC"/>
+    <text x="440" y="500" class="h">앱 안의 다른 화면이면</text>
+    <text x="440" y="524" class="d">화면 위 알림 (대화 제목 + 결과)</text>
+  </g>
+  <g>
+    <rect x="800" y="472" width="360" height="70" rx="14" fill="#FFFFFF" stroke="#DAD4DC"/>
+    <text x="820" y="500" class="h">탭이 뒤에 있으면</text>
+    <text x="820" y="524" class="d">시스템 알림(설정 시) + 탭 제목에 도착 수</text>
+  </g>
+
+  <text x="40" y="570" class="foot">새로고침해도 메시지 목록의 실행 중 번호(runningExecutionId)로 다시 구독한다. complete·error를 받으면 반드시 연결을 닫는다(자동 재연결 반복 방지).</text>
+</svg>

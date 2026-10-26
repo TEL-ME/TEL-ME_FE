@@ -1,0 +1,404 @@
+/*
+ * 무러바라 상태 표시 (CharacterStage)
+ *
+ * 조절용 CSS 변수 — .mudo-stage 또는 부모에서 덮어쓴다.
+ *   --mudo-size          캐릭터 영역 한 변 길이 (정사각형)
+ *   --mudo-accent-x/y    idle 강조선 위치 (캐릭터 영역 기준 %)
+ *   --mudo-dots-x/y      thinking 점 세 개 위치
+ *   --mudo-check-x/y     completed 체크 말풍선 위치
+ *   --mudo-check-size    체크 말풍선 크기 (캐릭터 영역 대비 비율)
+ *   --mudo-breathe       idle 숨쉬기 높이
+ *   --mudo-sway          thinking 좌우 이동 폭
+ *   --mudo-hop           completed 점프 높이
+ *   --mudo-brand / --mudo-accent / --mudo-ink / --mudo-surface / --mudo-line  색
+ */
+.mudo-stage {
+  position: relative;
+  --mudo-size: 140px;
+  --mudo-accent-x: 83%;
+  --mudo-accent-y: 10%;
+  --mudo-dots-x: 78%;
+  --mudo-dots-y: 4%;
+  --mudo-check-x: 74%;
+  --mudo-check-y: -4%;
+  --mudo-check-size: 0.24;
+  --mudo-breathe: 3px;
+  --mudo-sway: 2px;
+  --mudo-hop: 12px;
+  --mudo-brand: #c34074;
+  --mudo-accent: #f5237a;
+  --mudo-ink: #2b262d;
+  --mudo-muted: #6b696e;
+  --mudo-surface: #ffffff;
+  --mudo-line: #eadfe5;
+
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 10px;
+  font-family: Pretendard, 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  word-break: keep-all;
+}
+
+/* 크기가 고정된 무대: 포즈가 바뀌어도 레이아웃이 움직이지 않는다 */
+.mudo-stage__figure {
+  position: relative;
+  flex: none;
+  width: var(--mudo-size);
+  height: var(--mudo-size);
+}
+
+/* 상태별 몸 움직임은 이 래퍼에만 건다 (포즈 전환 transform과 겹치지 않게) */
+.mudo-stage__motion {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+/* ── 포즈 이미지 ───────────────────────── */
+.mudo-pose {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 50% 100%;
+  user-select: none;
+  pointer-events: none;
+  /* 비활성 포즈는 전환 없이 즉시 숨긴다 → 이전 포즈가 남아 보이지 않음 */
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mudo-pose.is-active {
+  opacity: 1;
+  visibility: visible;
+  animation: mudo-pose-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes mudo-pose-in {
+  from {
+    opacity: 0.55;
+    transform: translateY(2%) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── 상태별 몸 움직임 ───────────────────── */
+.mudo-stage[data-status='idle'] .mudo-stage__motion {
+  animation: mudo-breathe 3.2s ease-in-out infinite;
+}
+
+.mudo-stage[data-status='thinking'] .mudo-stage__motion {
+  animation: mudo-sway 2.6s ease-in-out infinite;
+}
+
+.mudo-stage[data-status='completed'] .mudo-stage__motion {
+  animation: mudo-hop 700ms cubic-bezier(0.3, 0.7, 0.3, 1) 1 both;
+}
+
+/* failed: 움직임을 멈춘다 */
+.mudo-stage[data-status='failed'] .mudo-stage__motion {
+  animation: none;
+}
+
+@keyframes mudo-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(calc(var(--mudo-breathe) * -1)) scaleY(1.008);
+  }
+}
+
+@keyframes mudo-sway {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  30% {
+    transform: translateX(calc(var(--mudo-sway) * -1)) rotate(-1deg);
+  }
+  70% {
+    transform: translateX(var(--mudo-sway)) rotate(1deg);
+  }
+}
+
+@keyframes mudo-hop {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(calc(var(--mudo-hop) * -1));
+  }
+  65% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(calc(var(--mudo-hop) * -0.2));
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* ── idle: 얼굴 옆 강조선 2개가 빠르게 두 번 깜빡이고 쉰다 ── */
+.mudo-accent {
+  position: absolute;
+  left: var(--mudo-accent-x);
+  top: var(--mudo-accent-y);
+  width: calc(var(--mudo-size) * 0.14);
+  height: calc(var(--mudo-size) * 0.14);
+  animation: mudo-blink-twice 2.8s linear infinite;
+}
+
+.mudo-accent i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: calc(var(--mudo-size) * 0.028);
+  min-width: 3px;
+  height: calc(var(--mudo-size) * 0.085);
+  border-radius: 999px;
+  background: var(--mudo-accent);
+  transform-origin: 50% 100%;
+}
+
+.mudo-accent i:first-child {
+  transform: translate(calc(var(--mudo-size) * 0.035), 0) rotate(25deg);
+}
+
+.mudo-accent i:last-child {
+  transform: translate(calc(var(--mudo-size) * 0.07), calc(var(--mudo-size) * 0.045)) rotate(65deg);
+}
+
+@keyframes mudo-blink-twice {
+  0%,
+  3% {
+    opacity: 0;
+  }
+  6%,
+  11% {
+    opacity: 1;
+  }
+  14%,
+  17% {
+    opacity: 0;
+  }
+  20%,
+  25% {
+    opacity: 1;
+  }
+  28%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── thinking: 점 세 개가 왼쪽부터 하나씩 → 함께 사라짐 ── */
+.mudo-dots {
+  position: absolute;
+  left: var(--mudo-dots-x);
+  top: var(--mudo-dots-y);
+  display: flex;
+  gap: calc(var(--mudo-size) * 0.025);
+}
+
+.mudo-dots i {
+  width: calc(var(--mudo-size) * 0.05);
+  height: calc(var(--mudo-size) * 0.05);
+  min-width: 5px;
+  min-height: 5px;
+  border-radius: 50%;
+  background: var(--mudo-brand);
+  opacity: 0;
+}
+
+.mudo-dots i:nth-child(1) {
+  animation: mudo-dot-1 1.8s linear infinite;
+}
+.mudo-dots i:nth-child(2) {
+  animation: mudo-dot-2 1.8s linear infinite;
+}
+.mudo-dots i:nth-child(3) {
+  animation: mudo-dot-3 1.8s linear infinite;
+}
+
+@keyframes mudo-dot-1 {
+  0%,
+  8% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  14%,
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  86%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes mudo-dot-2 {
+  0%,
+  28% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  34%,
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  86%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes mudo-dot-3 {
+  0%,
+  48% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  54%,
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  86%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* ── completed: 체크 말풍선이 한 번 나타났다 사라짐 ── */
+.mudo-check {
+  position: absolute;
+  left: var(--mudo-check-x);
+  top: var(--mudo-check-y);
+  width: calc(var(--mudo-size) * var(--mudo-check-size));
+  height: calc(var(--mudo-size) * var(--mudo-check-size));
+  min-width: 22px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50% 50% 50% 12%;
+  background: var(--mudo-surface);
+  border: 2px solid var(--mudo-brand);
+  color: var(--mudo-brand);
+  box-shadow: 0 4px 12px rgba(120, 40, 80, 0.15);
+  opacity: 0;
+  animation: mudo-check-pop 1.4s cubic-bezier(0.3, 0.7, 0.3, 1) 1 both;
+}
+
+.mudo-check svg {
+  width: 62%;
+  height: 62%;
+}
+
+@keyframes mudo-check-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(20%) scale(0.5);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.08);
+  }
+  28%,
+  72% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-15%) scale(0.95);
+  }
+}
+
+/* ── 상태 문구 ─────────────────────────── */
+.mudo-stage__caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: calc(var(--mudo-size) * 0.12);
+}
+
+.mudo-stage__text {
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--mudo-line);
+  background: var(--mudo-surface);
+  color: var(--mudo-ink);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mudo-stage[data-status='thinking'] .mudo-stage__text,
+.mudo-stage[data-status='completed'] .mudo-stage__text {
+  color: var(--mudo-brand);
+}
+
+.mudo-stage[data-status='failed'] .mudo-stage__text {
+  color: var(--mudo-muted);
+}
+
+.mudo-stage__retry {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--mudo-brand);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mudo-stage__retry:focus-visible {
+  outline: 2px solid var(--mudo-brand);
+  outline-offset: 2px;
+}
+
+/* hideCaption일 때: 화면에는 안 보이고 화면낭독기만 읽는다 */
+.mudo-stage__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 움직임 줄이기: 큰 움직임은 끄고 표시만으로 상태를 구분 ── */
+@media (prefers-reduced-motion: reduce) {
+  .mudo-stage .mudo-stage__motion,
+  .mudo-pose.is-active {
+    animation: none !important;
+  }
+
+  .mudo-accent,
+  .mudo-dots i,
+  .mudo-check {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}

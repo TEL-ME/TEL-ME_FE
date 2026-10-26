@@ -1,13 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>tel-me-fe</title>
+    <!-- 대표 로고: 무러바라 (원본 src/assets/mudo/mudo-logo.png) -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@900&display=swap" rel="stylesheet" />
+    <title>TEL-ME</title>
+    <script>
+      // 첫 화면이 그려지기 전에 테마를 정해 깜빡임을 막는다. 저장 키는 src/stores/themeStore.ts와 같다.
+      try {
+        var t = JSON.parse(localStorage.getItem('telme-theme') || '{}').state?.theme || 'system'
+        if (t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" data-clarity-mask="true"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
